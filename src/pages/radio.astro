@@ -1,0 +1,76 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="业余无线电 · 饮月听风" active="radio">
+  <main class="container page">
+    <span class="badge badge-brand">业余无线电</span>
+    <h1 class="page-title">业余无线电</h1>
+    <p class="page-desc">呼号、证件与业余无线电台分区地图</p>
+
+    <div class="map-wrap">
+      <img
+        class="map-img"
+        src={`${import.meta.env.BASE_URL}radio-map.svg`}
+        alt="中国业余无线电呼号分区图（第 0-9 区）"
+      />
+    </div>
+
+    <p class="map-note">
+      依据工信部《业余无线电台呼号管理办法》附件二「业余无线电台分区表」绘制，
+      仅示意呼号分区，不作疆界依据。
+    </p>
+  </main>
+</Layout>
+
+<style>
+  .page {
+    padding: 80px 24px 120px;
+  }
+
+  .page-title {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin: 16px 0 8px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .page-desc {
+    font-size: 15px;
+    color: var(--text-soft);
+    margin-bottom: 40px;
+  }
+
+  .map-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    padding: 16px;
+  }
+
+  .map-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+  }
+
+  .map-note {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    .page { padding: 60px 16px 80px; }
+    .page-title { font-size: 32px; }
+    .map-wrap { padding: 8px; }
+  }
+</style>

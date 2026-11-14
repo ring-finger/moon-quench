@@ -1,0 +1,260 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const title = '扬州3日自然山水游';
+const subtitle = '9月25日 - 9月27日';
+const brief =
+  '两人三日扬州漫游：首日穿行老城园林与市井长街，次日漫游瘦西湖湖山古寺，末日探访运河三湾的文博新地标。全程步行串联，共 7 站约 5.7 km。';
+
+// 地图页路径（位于 public/yangzhou-map.html，用 BASE_URL 适配 GitHub Pages 子路径）
+const mapSrc = `${import.meta.env.BASE_URL}yangzhou-map.html`;
+
+const days = [
+  {
+    day: 'Day 1',
+    date: '9月25日',
+    theme: '老城园林 · 市井长街',
+    color: '#2F7FA8',
+    stops: [
+      { title: '生东1996·淮扬老字号(何园店)', intro: '开了三十年的淮扬老字号，挨在何园隔壁的徐凝门大街上' },
+      { title: '何园', intro: '晚清第一名园，1500 米复道回廊串起中西合璧的宅园' },
+      { title: '东关街', intro: '千年青石古街，青砖黛瓦间吃遍扬州小吃与淮扬细点' },
+    ],
+  },
+  {
+    day: 'Day 2',
+    date: '9月26日',
+    theme: '瘦西湖 · 湖山古寺',
+    color: '#2E9E6B',
+    stops: [
+      { title: '观音山禅院', intro: '蜀冈深处的清净禅院，黄墙蜿蜒树影深，少有游客' },
+      { title: '瘦西湖', intro: '两岸花柳全依水，一路楼台直到山' },
+      { title: '宋夹城体育休闲公园', intro: '宋代城池遗址上的免费公园，环湖跑道与草地日落' },
+    ],
+  },
+  {
+    day: 'Day 3',
+    date: '9月27日',
+    theme: '运河三湾 · 文博新地标',
+    color: '#B08050',
+    stops: [
+      { title: '中国大运河博物馆', intro: '卧在运河三湾湿地上的国家级博物馆，一馆看尽千年运河' },
+    ],
+  },
+];
+---
+
+<Layout title={`${title} · 饮月听风`} active="travel">
+  <main class="container page">
+    <span class="badge badge-brand">旅游路线</span>
+    <h1 class="page-title">{title}</h1>
+    <p class="page-sub">{subtitle}</p>
+    <p class="page-brief">{brief}</p>
+
+    <!-- 地图主体：内嵌完整的地图行程指南 -->
+    <div class="map-shell">
+      <iframe
+        class="map-frame"
+        src={mapSrc}
+        title="扬州3日自然山水游 · 地图行程指南"
+        loading="lazy"
+      ></iframe>
+      <div class="map-toolbar">
+        <span class="map-hint">地图交互 · 点击站点查看详情与步行路线</span>
+        <a class="map-open" href={mapSrc} target="_blank" rel="noopener">
+          新窗口打开 ↗
+        </a>
+      </div>
+    </div>
+
+    <!-- 行程概览（补充） -->
+    <div class="overview">
+      <h2 class="overview-title">行程概览</h2>
+      <div class="day-grid">
+        {days.map((d) => (
+          <section class="day-card">
+            <div class="day-head">
+              <span class="day-dot" style={`background:${d.color}`}></span>
+              <div>
+                <h3 class="day-name">{d.day}</h3>
+                <span class="day-date">{d.date} · {d.theme}</span>
+              </div>
+            </div>
+            <ol class="stop-list">
+              {d.stops.map((s) => (
+                <li class="stop-item">
+                  <span class="stop-title">{s.title}</span>
+                  <span class="stop-intro">{s.intro}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .page {
+    padding: 80px 24px 120px;
+  }
+
+  .page-title {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin: 16px 0 6px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .page-sub {
+    font-size: 15px;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+
+  .page-brief {
+    font-size: 15px;
+    color: var(--text-soft);
+    max-width: 680px;
+    line-height: 1.8;
+    margin-bottom: 40px;
+  }
+
+  /* 地图主体 */
+  .map-shell {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    background: var(--bg-card);
+  }
+
+  .map-frame {
+    display: block;
+    width: 100%;
+    height: 640px;
+    border: none;
+  }
+
+  .map-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .map-hint {
+    font-size: 13px;
+    color: var(--text-soft);
+  }
+
+  .map-open {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brand);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .map-open:hover {
+    text-decoration: underline;
+  }
+
+  /* 行程概览 */
+  .overview {
+    margin-top: 64px;
+  }
+
+  .overview-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 24px;
+  }
+
+  .day-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .day-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .day-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .day-dot {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-top: 6px;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  .day-name {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .day-date {
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .stop-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .stop-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-left: 14px;
+    border-left: 2px solid var(--border-soft);
+  }
+
+  .stop-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .stop-intro {
+    font-size: 13px;
+    color: var(--text-soft);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 768px) {
+    .page { padding: 60px 16px 80px; }
+    .page-title { font-size: 32px; }
+    .map-frame { height: 480px; }
+    .map-toolbar { flex-wrap: wrap; }
+  }
+</style>

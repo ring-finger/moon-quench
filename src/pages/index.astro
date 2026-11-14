@@ -1,0 +1,158 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ThreeBackground from '../components/ThreeBackground.astro';
+
+const base = import.meta.env.BASE_URL;
+
+const modules = [
+  {
+    href: `${base}blog`,
+    title: '博客',
+    icon: '✍️',
+    desc: '记录日常思考与技术随笔',
+    external: false,
+    hrefExternal: '',
+  },
+  {
+    href: `${base}travel`,
+    title: '旅游路线',
+    icon: '🗺️',
+    desc: '按时间倒序整理的旅途足迹',
+    external: false,
+    hrefExternal: '',
+  },
+  {
+    href: `${base}radio`,
+    title: '业余无线电',
+    icon: '📡',
+    desc: '呼号、证件与电台分区地图',
+    external: false,
+    hrefExternal: '',
+  },
+];
+---
+
+<Layout title="饮月听风 · 个人作品集" active="">
+  <main class="hero-wrap">
+    <ThreeBackground />
+    <section class="hero container">
+      <span class="badge badge-brand">山间有月 · 风里听泉</span>
+      <h1>饮月听风</h1>
+      <p class="hero-sub">记录作品、旅途与电波，一个安静的角落</p>
+    </section>
+
+    <section class="modules container">
+      {
+        modules.map((m) => (
+          <a
+            class="module-card fade-in"
+            href={m.href}
+            target={m.external ? '_blank' : undefined}
+            rel={m.external ? 'noopener' : undefined}
+          >
+            <span class="m-icon">{m.icon}</span>
+            <h2>{m.title}</h2>
+            <p>{m.desc}</p>
+            <span class="m-enter">进入 →</span>
+          </a>
+        ))
+      }
+    </section>
+  </main>
+</Layout>
+
+<style>
+  .hero-wrap {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 140px 24px 80px;
+  }
+
+  .hero h1 {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    margin: 24px 0 16px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 60%, #22d3ee 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-sub {
+    font-size: 17px;
+    color: var(--text-soft);
+    letter-spacing: 1px;
+  }
+
+  .modules {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding: 20px 24px 120px;
+  }
+
+  .module-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px 32px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+  }
+
+  .module-card:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+
+  .m-icon {
+    font-size: 40px;
+    line-height: 1;
+  }
+
+  .module-card h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .module-card p {
+    font-size: 14px;
+    color: var(--text-soft);
+    flex: 1;
+  }
+
+  .m-enter {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--brand);
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: all 0.3s;
+  }
+
+  .module-card:hover .m-enter {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  @media (max-width: 768px) {
+    .hero { padding: 100px 24px 60px; }
+    .hero h1 { font-size: 40px; }
+    .modules { grid-template-columns: 1fr; padding-bottom: 80px; }
+  }
+</style>

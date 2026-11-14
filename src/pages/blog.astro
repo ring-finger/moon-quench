@@ -1,0 +1,70 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const blogUrl = 'https://blog.soulcottage.top/';
+---
+
+<Layout title="博客 · 饮月听风" active="blog">
+  <main class="container page">
+    <span class="badge badge-brand">博客</span>
+    <h1 class="page-title">我的博客</h1>
+    <p class="page-desc">
+      这里记录日常思考与技术随笔，点击下方按钮前往我的博客。
+    </p>
+
+    <a class="btn-jump" href={blogUrl} target="_blank" rel="noopener">
+      前往博客
+      <span>→</span>
+    </a>
+  </main>
+</Layout>
+
+<style>
+  .page {
+    padding: 120px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .page-title {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .page-desc {
+    font-size: 16px;
+    color: var(--text-soft);
+    max-width: 480px;
+  }
+
+  .btn-jump {
+    margin-top: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 32px;
+    border-radius: 12px;
+    background: var(--grad-brand);
+    color: #fff;
+    font-weight: 600;
+    font-size: 16px;
+    box-shadow: var(--shadow-lg);
+    transition: all 0.25s;
+  }
+
+  .btn-jump:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 48px rgba(99, 102, 241, 0.24);
+  }
+
+  .btn-jump span { transition: transform 0.25s; }
+  .btn-jump:hover span { transform: translateX(4px); }
+</style>

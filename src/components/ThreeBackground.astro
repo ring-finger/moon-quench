@@ -1,0 +1,101 @@
+---
+// ThreeBackground.astro
+// 首页星月粒子背景：本地 import three（构建时打包，不依赖 CDN）
+---
+
+<div class="three-bg" data-three-bg></div>
+
+<style>
+  .three-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+</style>
+
+<script>
+  import * as THREE from 'three';
+
+  const mount = document.querySelector('[data-three-bg]');
+  if (!mount) throw new Error('ThreeBackground mount not found');
+
+  const width = mount.clientWidth;
+  const height = mount.clientHeight;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 100);
+  camera.position.z = 30;
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  mount.appendChild(renderer.domElement);
+
+  // 粒子星空
+  const count = 220;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 60;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 40;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0x6366f1,
+    size: 0.35,
+    transparent: true,
+    opacity: 0.7,
+    sizeAttenuation: true,
+  });
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  // 一轮明月（柔和光晕的圆）
+  const moonGeo = new THREE.SphereGeometry(4, 32, 32);
+  const moonMat = new THREE.MeshBasicMaterial({
+    color: 0x8b5cf6,
+    transparent: true,
+    opacity: 0.35,
+  });
+  const moon = new THREE.Mesh(moonGeo, moonMat);
+  moon.position.set(14, 8, -8);
+  scene.add(moon);
+
+  // 鼠标轻微视差
+  let targetX = 0;
+  let targetY = 0;
+  window.addEventListener('mousemove', (e) => {
+    targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+    targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+  });
+
+  function animate() {
+    points.rotation.y += 0.0008;
+    points.rotation.x += 0.0003;
+    camera.position.x += (targetX * 1.5 - camera.position.x) * 0.05;
+    camera.position.y += (-targetY * 1.5 - camera.position.y) * 0.05;
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  // 响应式
+  window.addEventListener('resize', () => {
+    const w = mount.clientWidth;
+    const h = mount.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+
+  // 减少移动端开销
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    points.rotation.y = 0.2;
+    cancelAnimationFrame(animate as unknown as number);
+    renderer.render(scene, camera);
+  }
+</script>

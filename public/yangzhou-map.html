@@ -1,0 +1,2415 @@
+<!doctype html>
+<!--
+  yangzhou-map-guide.html —— 两人三日 扬州漫游 · 地图行程指南（单文件 HTML）
+  ---------------------------------------------------------------------------
+  这份模板只固化「接入腾讯地图这件事里机械且容易踩坑的部分」：
+    · JSAPI GL 与组件的引入顺序
+    · 地图容器的固定宽高（flex 布局下极易塌成 0，表现为底图空白）
+    · 指南数据内嵌在页面里，双击即可打开，不必起 http 服务
+    · fitBounds 留白避开地图自带控件（见下方 safePadding）
+    · 把实例挂到 window.gm，方便在控制台调 API
+
+  页面 UI（面板、图例、清单……）**故意不在这里**：组件只负责地图内的点 / 线 / 飞线 / 信息窗，
+  视觉按场景定，预置一套只会限制发挥。要加就写在下面三处「UI 挂载区」注释（样式 / 结构 / 逻辑），
+  浮层、平级分栏都行，别压住关键内容（浮层记得把占位传给 safePadding），
+  接线见 references/map-components.md。
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>扬州3日自然山水游</title>
+    <style>
+/*!
+ * guide-map.css —— GuideMap 配套样式
+ * ---------------------------------------------------------------------------
+ * 只包含两部分：
+ *   1. 页面骨架（地图容器必须有固定宽高，flex 布局下尤其重要）
+ *   2. 内置信息窗模板（gm-iw-*）与提示条（gm-tip）
+ * 组件本身不提供任何面板 / 侧栏 UI，页面级 UI 请在业务侧自行实现。
+ *
+ * 提示：自定义浮层需 z-index > 1000，否则会被腾讯地图控件层挡住点击。
+ */
+
+/* ==========================================================================
+ * 1. 页面骨架
+ * ========================================================================== */
+
+.gm-app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0f1115;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #1b1d22;
+}
+
+.gm-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 面板 / 图例等页面 UI 的样式**故意不在这里**：浮层还是分栏、长什么样由页面自己定。
+ * 两件与布局有关的事值得记住：
+ *   · 浮层要 z-index > 1000（模板里的 --ui-z），并把占位传给 safePadding()
+ *   · 想让面板与地图平级并排，自己写 flex 即可，但地图那格要 flex:1 且
+ *     min-width:0 / min-height:0，否则会塌成 0（底图空白）或撑出滚动条
+ */
+
+/* ==========================================================================
+ * 2. 内置信息窗模板
+ * 注意：信息窗内容容器要显式允许换行，否则长文本不折行
+ * ========================================================================== */
+
+.gm-iw {
+  max-width: 264px;
+  padding: 2px 2px 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #1b1d22;
+  word-wrap: break-word;
+  white-space: break-spaces;
+}
+
+.gm-iw-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 10.5px;
+  line-height: 1.7;
+}
+
+.gm-iw-title {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.gm-iw-sub {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.gm-iw-body {
+  margin: 7px 0 0;
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.72;
+}
+
+.gm-iw-note {
+  margin: 7px 0 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(17, 20, 26, 0.05);
+  font-size: 11.5px;
+  color: #4b5563;
+  line-height: 1.66;
+}
+
+.gm-iw-foot {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(17, 20, 26, 0.08);
+  font-size: 10.5px;
+  color: #6b7280;
+}
+
+/* ==========================================================================
+ * 3. 加载 / 错误提示
+ * ========================================================================== */
+
+.gm-tip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1301;
+  max-width: 78vw;
+  transform: translate(-50%, -50%);
+  padding: 14px 22px;
+  border-radius: 12px;
+  background: rgba(15, 17, 21, 0.86);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.gm-tip.is-error {
+  background: rgba(176, 57, 44, 0.94);
+}
+
+</style>
+    <style>
+      :root {
+        /* 地图自带控件安全区：右上 100×200（指南针+缩放）、左下 240×60（比例尺+Logo）。
+           数值与 GuideMap.SAFE_AREA 一致；只有贴右上 / 左下的浮层才用它们避让。
+           左上角与右下角没有控件，贴那两角直接 16px，套 --safe-* 会把浮层推离边缘一大截
+           （右下角的小程序码浮窗最明显）。 */
+        --safe-right: 116px; /* 100 + 16 间距 */
+        --safe-bottom: 76px; /*  60 + 16 间距 */
+        --safe-left: 256px; /* 240 + 16 间距 */
+        /* 右下角小程序码浮窗（约 120×120）占的高度带。页面右侧放面板时二者会撞车：
+           要么把二维码收进面板底部当固定区块，要么让面板底边停在它上方
+           （bottom: var(--qr-band)），否则最后一项被二维码压住。没有二维码就当它是 16px。 */
+        --qr-band: 152px; /* 120 + 16×2 */
+        --ui-z: 1201; /* 必须 > 1000，否则被地图控件层遮挡、点击不响应 */
+      }
+      /* 地图容器必须有确定高度，否则底图整块空白 */
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* 全局细滚动条：面板 / 站点清单一旦溢出，默认滚动条又粗又抢戏 */
+      *::-webkit-scrollbar {
+        width: 8px !important;
+        height: 8px !important;
+      }
+      *::-webkit-scrollbar-track {
+        background: transparent !important;
+      }
+      *::-webkit-scrollbar-thumb {
+        background: #80808066 !important;
+        border-radius: 4px !important;
+        border: 2px solid transparent !important;
+        background-clip: padding-box !important;
+      }
+      *::-webkit-scrollbar-thumb:hover {
+        background: #80808099 !important;
+      }
+      *::-webkit-scrollbar-corner {
+        background: transparent !important;
+      }
+      * {
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(128, 128, 128, 0.4) transparent !important;
+      }
+
+      /* ==== UI 挂载区（样式）====
+       浮层用 z-index: var(--ui-z)；贴右上 / 左下用 --safe-* 避开地图控件，左上 / 右下直接 16px。
+       面板内容会随数据变长：给容器高度上限（如 max-height: calc(100% - 32px)），
+       内容区 overflow-y: auto 且 min-height: 0，否则超出的项会被裁掉又滚不到。
+       面板在右侧且页面有二维码时，二维码收进面板底部，或让面板底边停在 var(--qr-band) 上方。 */
+
+      /* 扬州行程面板：青绿主色呼应运河 / 瘦西湖 / 蜀冈园林 */
+      .pnl {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        width: 320px;
+        max-height: calc(100% - 32px);
+        display: flex;
+        flex-direction: column;
+        z-index: var(--ui-z);
+        background: rgba(255, 255, 255, 0.93);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(47, 127, 168, 0.22);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(20, 50, 60, 0.16);
+        overflow: hidden;
+        font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: #23424c;
+      }
+      .pnl-hd {
+        flex: none;
+        padding: 15px 18px 12px;
+        background: linear-gradient(180deg, rgba(47, 127, 168, 0.1), rgba(255, 255, 255, 0));
+        border-bottom: 1px solid rgba(47, 127, 168, 0.14);
+      }
+      .kick { font-size: 11.5px; letter-spacing: 0.08em; color: #5b8a99; }
+      .pnl-hd h1 { margin: 6px 0 5px; font-size: 19px; font-weight: 600; letter-spacing: 0.01em; }
+      .pnl-sub { margin: 0; font-size: 12px; color: #6d8a92; }
+      .pnl-bd { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 10px 12px 14px; }
+      .day { margin-bottom: 10px; }
+      .g {
+        display: flex; align-items: center; gap: 8px; width: 100%;
+        padding: 8px 10px; border: 1px solid transparent; border-radius: 9px;
+        background: rgba(47, 127, 168, 0.07); cursor: pointer;
+        font: inherit; font-size: 14px; font-weight: 600; color: #23424c; text-align: left;
+      }
+      .g:hover { background: rgba(47, 127, 168, 0.13); }
+      .g i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+      .g em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 400; color: #7d949b; }
+      .g.off { opacity: 0.4; }
+      .stops { list-style: none; margin: 6px 0 0; padding: 0 0 0 4px; }
+      .stop { display: flex; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+      .stop:hover { background: rgba(47, 127, 168, 0.08); }
+      .stop.on { background: rgba(47, 127, 168, 0.17); }
+      .sq {
+        flex: none; width: 19px; height: 19px; border-radius: 50%;
+        display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #fff;
+      }
+      .stop b { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; }
+      .stop .intro { display: block; font-size: 11.5px; color: #7b9199; line-height: 1.45; margin-top: 2px; }
+      .pnl-ft {
+        flex: none; padding: 9px 14px; border-top: 1px solid rgba(47, 127, 168, 0.14);
+        display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: #6d8a92;
+      }
+      .lg { display: inline-flex; align-items: center; gap: 5px; }
+      .lg i { width: 18px; height: 0; border-top: 2px solid #5b8a99; }
+      .lg-dashed i { border-top-style: dashed; }
+      .lg-arc i { border-top: 2px dotted #b08050; }
+      /* 站间「下一程」交通提示：方式 + 距离 + 耗时 */
+      .leg {
+        display: flex; align-items: center; gap: 6px;
+        margin: 1px 0 1px 40px; padding: 2px 8px;
+        font-size: 11px; color: #7d949b; line-height: 1.5;
+      }
+      .leg svg { flex: none; color: #5b8a99; }
+      .leg b { font-weight: 500; color: #5b8a99; }
+      /* 每日图例（按天配色） */
+      .lg-dot i { width: 9px; height: 9px; border-radius: 50%; border: none; flex: none; }
+      .legend-note { flex-basis: 100%; margin-top: 2px; font-size: 10.5px; color: #93a8ae; }
+      /* 信息窗扩展：亮点标签 / 到达贴士 */
+      .gm-iw-tags { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
+      .gm-iw-tags span {
+        padding: 1px 8px; border-radius: 999px;
+        background: rgba(17, 20, 26, 0.06); color: #374151;
+        font-size: 10.5px; line-height: 1.7;
+      }
+      .gm-iw-tip {
+        margin: 8px 0 0; padding: 7px 9px; border-radius: 8px;
+        background: rgba(47, 127, 168, 0.08);
+        font-size: 11.5px; color: #3d5a66; line-height: 1.66;
+      }
+      .gm-iw-tip b { margin-right: 4px; color: #2F7FA8; font-weight: 600; }
+      @media (max-width: 820px) {
+        .pnl { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 48%; }
+      }
+    </style>
+    <!-- 0. 沙箱 storage shim：sandbox iframe 下 localStorage 访问抛 SecurityError，注入内存 shim 兜底 -->
+    <script type="text/javascript">
+      (function () {
+        function probe(name) {
+          try { window[name].setItem('__wb_probe__', '1'); window[name].removeItem('__wb_probe__'); return true; }
+          catch (e) { return false; }
+        }
+        if (probe('localStorage') && probe('sessionStorage')) return;
+        function makeShim() {
+          var mem = Object.create(null);
+          var shim = {
+            getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+            setItem: function (k, v) { mem[k] = String(v); },
+            removeItem: function (k) { delete mem[k]; },
+            clear: function () { mem = Object.create(null); },
+            key: function (i) { var ks = Object.keys(mem); return i >= 0 && i < ks.length ? ks[i] : null; }
+          };
+          Object.defineProperty(shim, 'length', { get: function () { return Object.keys(mem).length; } });
+          return shim;
+        }
+        ['localStorage', 'sessionStorage'].forEach(function (name) {
+          if (probe(name)) return;
+          var shim = makeShim();
+          try {
+            Object.defineProperty(window, name, { configurable: true, get: function () { return shim; } });
+          } catch (e) { /* 个别环境禁止重定义，保持原生行为 */ }
+        });
+      })();
+    </script>
+    <!-- 腾讯地图 JSAPI GL 通过 key 鉴权。将下方 __TENCENT_MAP_KEY__ 替换为你的腾讯位置服务 key -->
+    <script type="text/javascript">
+      window._TMapSecurityConfig = { serviceHost: '' };
+    </script>
+    <!-- SDK 由页尾引导脚本动态注入；visualization 附加库用于飞线，不加会自动降级为虚线折线，不会报错。 -->
+    <script>
+/*!
+ * guide-map.js —— 指南 2.0（guide-v2.proto.md / TravelGuideV2）地图渲染组件
+ * ---------------------------------------------------------------------------
+ * 依赖：腾讯地图 JavaScript API GL
+ *   <script src=https://map.qq.com/api/gljs?v=1.exp&libraries=visualization><\/script>（URL 不带 key，密钥经 _TMapSecurityConfig.serviceHost 代理获取）
+ *   （visualization 附加库可选，缺失时跨组示意线自动降级为虚线折线）
+ *
+ * 职责边界
+ *   数据层：proto3 JSON（枚举数字/全名/短名皆可）→ 扁平模型（groups / points / links / arcs）
+ *   渲染层：MultiMarker（点）+ MultiPolyline（轨迹）+ visualization.Arc（跨组示意）+ InfoWindow
+ *   交互层：选中、聚焦、分组筛选、顺序巡游、事件订阅
+ *
+ * 最简用法
+ *   const gm = new GuideMap({ container: 'map', data: RESP_JSON });
+ *
+ * 纯数据用法（不依赖 TMap）
+ *   const model = GuideMap.parse(RESP_JSON);
+ *
+ * 文档：../README.md        类型声明：./guide-map.d.ts
+ * 导出：window.GuideMap（同时兼容 CommonJS / AMD）
+ */
+/// <reference path="./guide-map.d.ts" />
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else if (typeof define === 'function' && define.amd) define([], factory);
+  else root.GuideMap = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  /* ========================================================================
+   * 0. 常量
+   * ====================================================================== */
+
+  /** 腾讯地图自带控件占位区；自定义 UI 需 z-index > 1000 才能响应点击 */
+  var SAFE_AREA = {
+    topRight: { width: 100, height: 200 }, // 指南针 + 缩放
+    bottomLeft: { width: 240, height: 60 }, // 比例尺 + Logo
+    zIndex: 1201,
+  };
+
+  /** 出行方式 → 中文名（GuideTransitLink.mode） */
+  var MODE_LABEL = {
+    walking: '步行',
+    bicycling: '骑行',
+    driving: '驾车',
+    transit: '公交',
+    metro: '地铁',
+    taxi: '打车',
+    custom: '自定义',
+  };
+
+  /** 元素类型 → 中文名（GuideElementType） */
+  var TYPE_LABEL = {
+    poi: '地点',
+    coord: '自定义点',
+    route: '路线',
+    area: '区域',
+    ticket: '车票',
+    flight: '航班',
+    hotel: '酒店',
+    taxi: '打车',
+  };
+
+  /** 分组类型 → 中文名（GuideGroupType） */
+  var GROUP_TYPE_LABEL = {
+    day: '日程',
+    topic: '主题',
+    option: '备选',
+    pending: '待规划',
+    stage: '阶段',
+    tag: '标签',
+  };
+
+  /**
+   * 出行方式 → 线宽微调（统一实线，仅调粗细）。
+   * 必须为正整数：PolylineStyle.width 只接受正整数，小数会被 JSAPI 判为无效。
+   */
+  var MODE_WIDTH = {
+    walking: 3,
+    bicycling: 3,
+    taxi: 4,
+    driving: 4,
+    transit: 5,
+    metro: 5,
+  };
+
+  /** 可落点为单个标记的元素类型；route / area 为线面形态 */
+  var POINT_LIKE = ['poi', 'coord', 'ticket', 'flight', 'hotel', 'taxi'];
+
+  var DEFAULT_COLOR = '#3777FF';
+
+  /* ========================================================================
+   * 1. 工具函数
+   * ====================================================================== */
+
+  function isFn(v) {
+    return typeof v === 'function';
+  }
+
+  function isPlainObject(v) {
+    return !!v && typeof v === 'object' && !Array.isArray(v);
+  }
+
+  /** 深一层合并，后者覆盖前者，不修改入参 */
+  function merge(base, over) {
+    var out = {};
+    var k;
+    for (k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = base[k];
+    if (!over) return out;
+    for (k in over) {
+      if (!Object.prototype.hasOwnProperty.call(over, k)) continue;
+      out[k] = isPlainObject(out[k]) && isPlainObject(over[k]) ? merge(out[k], over[k]) : over[k];
+    }
+    return out;
+  }
+
+  /** HTML 转义：所有注入 DOM / 信息窗的数据文本都必须过这里 */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+
+  /**
+   * 解析 hsl() / hsla()，兼容逗号与空格两种语法：
+   *   hsl(210, 60%, 50%) / hsl(210 60% 50%) / hsla(210,60%,50%,.5) / hsl(210 60% 50% / 50%)
+   * @returns {?{r:number,g:number,b:number,a:number}} 非 hsl 返回 null
+   */
+  function parseHSL(color) {
+    var m = String(color)
+      .trim()
+      .match(/^hsla?\(\s*([-\d.]+)(?:deg)?\s*[,\s]\s*([\d.]+)%\s*[,\s]\s*([\d.]+)%\s*(?:[,/]\s*([\d.]+%?)\s*)?\)$/i);
+    if (!m) return null;
+
+    var h = ((parseFloat(m[1]) % 360) + 360) % 360;
+    var s = Math.min(100, Math.max(0, parseFloat(m[2]))) / 100;
+    var l = Math.min(100, Math.max(0, parseFloat(m[3]))) / 100;
+    var a = 1;
+    if (m[4] != null) {
+      a = m[4].indexOf('%') >= 0 ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+      if (isNaN(a)) a = 1;
+    }
+
+    // CSS Color 4 参考算法
+    function f(n) {
+      var k = (n + h / 30) % 12;
+      return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+    }
+    return {
+      r: Math.round(f(0) * 255),
+      g: Math.round(f(8) * 255),
+      b: Math.round(f(4) * 255),
+      a: a,
+    };
+  }
+
+  /**
+   * 颜色归一。JSAPI 的 color 类字段只接受 rgb() / rgba() / #RRGGBB，
+   * 传入 hsl() 会解析失败并渲染成白色，故在交给 TMap 之前统一转成 rgb()/rgba()。
+   * 其它格式原样返回，由 JSAPI 自行处理。
+   */
+  function normColor(color) {
+    if (color == null) return color;
+    var hsl = parseHSL(color);
+    if (!hsl) return color;
+    return hsl.a >= 1
+      ? 'rgb(' + hsl.r + ',' + hsl.g + ',' + hsl.b + ')'
+      : 'rgba(' + hsl.r + ',' + hsl.g + ',' + hsl.b + ',' + hsl.a + ')';
+  }
+
+  /** #RGB / #RRGGBB / rgb() / rgba() / hsl() / hsla() → rgba(r,g,b,alpha) */
+  function withAlpha(color, alpha) {
+    if (color == null) return color;
+    var c = String(color).trim();
+    if (c.charAt(0) === '#') {
+      var h = c.slice(1);
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      if (h.length !== 6) return c;
+      var r = parseInt(h.slice(0, 2), 16);
+      var g = parseInt(h.slice(2, 4), 16);
+      var b = parseInt(h.slice(4, 6), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+    var hsl = parseHSL(c);
+    if (hsl) return 'rgba(' + hsl.r + ',' + hsl.g + ',' + hsl.b + ',' + alpha + ')';
+    var m = c.match(/^rgba?\(([^)]+)\)$/i);
+    if (m) {
+      var p = m[1].split(',');
+      return 'rgba(' + p[0].trim() + ',' + p[1].trim() + ',' + p[2].trim() + ',' + alpha + ')';
+    }
+    return c;
+  }
+
+  /** SVG 字符串 → data URI（用 encodeURIComponent，btoa 遇中文会抛错） */
+  function svgURI(svg) {
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  /**
+   * 规整 PolylineStyle 参数，避免触发 JSAPI 的「属性无效」告警。
+   * JSAPI 对折线样式有硬性数值约束（见「矢量图形」文档）：
+   *   · width       正整数（< 1 会被忽略）
+   *   · borderWidth 非负整数
+   *   · arrowOptions.width / height / space 最大 255
+   * 传小数不会报错但该属性直接失效（例如 borderWidth: 1.4 → 白边不画），
+   * 因此在交给 TMap 之前统一取整并夹取值域。不修改入参。
+   *
+   * @param {Object} style PolylineStyleOptions
+   * @returns {Object} 规整后的新对象
+   */
+  function sanitizePolylineStyle(style) {
+    var out = merge(style, null);
+
+    if (out.width != null) {
+      var w = Math.round(Number(out.width));
+      out.width = isNaN(w) || w < 1 ? 1 : w;
+    }
+    if (out.borderWidth != null) {
+      var bw = Math.round(Number(out.borderWidth));
+      out.borderWidth = isNaN(bw) || bw < 0 ? 0 : bw;
+    }
+    if (isPlainObject(out.arrowOptions)) {
+      var ao = merge(out.arrowOptions, null);
+      ['width', 'height', 'space'].forEach(function (k) {
+        if (ao[k] == null) return;
+        var v = Math.round(Number(ao[k]));
+        ao[k] = isNaN(v) ? undefined : Math.max(1, Math.min(255, v));
+      });
+      out.arrowOptions = ao;
+    }
+    return out;
+  }
+
+  /** 米 → 友好距离 */
+  function fmtDistance(m) {
+    if (m == null || isNaN(m)) return '';
+    return m >= 1000 ? (m / 1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : Math.round(m) + ' m';
+  }
+
+  /**
+   * 分钟 → 友好耗时。
+   * spec 2.0.0 规定 duration 单位为分钟，但 1.0 转换产物常见为秒，
+   * unit 缺省时按阈值启发式判断（> 600 视为秒）。
+   */
+  function fmtDuration(v, unit) {
+    if (v == null || isNaN(v)) return '';
+    var min = unit === 'second' ? v / 60 : unit === 'minute' ? v : v > 600 ? v / 60 : v;
+    min = Math.round(min);
+    if (min < 60) return min + ' 分钟';
+    var h = Math.floor(min / 60);
+    var mm = min % 60;
+    return h + ' 小时' + (mm ? ' ' + mm + ' 分钟' : '');
+  }
+
+  /* ========================================================================
+   * 2. 枚举归一（proto3 JSON 的三种形态收敛为小写短名）
+   *    1) 数字        group_type: 5
+   *    2) 大写全名    group_type: 'GROUP_TYPE_STAGE'
+   *    3) 小写短名    group_type: 'stage'
+   *    *_UNSPECIFIED（0）统一归一为 ''，由调用方决定缺省行为。
+   *    names 下标即 proto 枚举数值，顺序不可调整。
+   * ====================================================================== */
+
+  var ENUMS = {
+    element_type: {
+      prefix: 'ELEMENT_TYPE_',
+      names: ['unspecified', 'poi', 'coord', 'route', 'area', 'ticket', 'flight', 'hotel', 'taxi'],
+    },
+    group_type: {
+      prefix: 'GROUP_TYPE_',
+      names: ['unspecified', 'day', 'topic', 'option', 'pending', 'stage', 'tag'],
+    },
+    group_subtype: {
+      prefix: 'GROUP_SUBTYPE_',
+      names: ['unspecified', 'endpoints', 'waypoints', 'service_area'],
+    },
+    role: { prefix: 'ROLE_', names: ['unspecified', 'main', 'side', 'marker'] },
+    relation_type: {
+      prefix: 'RELATION_TYPE_',
+      names: ['unspecified', 'transit', 'sequence', 'substitute', 'attach', 'narrative', 'segment_link'],
+    },
+    relation_scope: { prefix: 'RELATION_SCOPE_', names: ['unspecified', 'guide', 'group', 'element'] },
+    strength: { prefix: 'STRENGTH_', names: ['unspecified', 'must', 'recommend', 'optional'] },
+    order_mode: {
+      prefix: 'ORDER_MODE_',
+      names: ['unspecified', 'strict', 'ordered', 'loose', 'unordered', 'partial'],
+    },
+    selection_mode: { prefix: 'SELECTION_MODE_', names: ['unspecified', 'all', 'pick_one'] },
+    polyline_type: { prefix: 'POLYLINE_TYPE_', names: ['unspecified', 'delta_latlng'] },
+  };
+
+  /**
+   * @param {string} kind ENUMS 的键名
+   * @param {*} v 数字 / 数字串 / 大写全名 / 小写短名
+   * @returns {string} 小写短名；空值与 UNSPECIFIED → ''
+   */
+  function normEnum(kind, v) {
+    var def = ENUMS[kind];
+    if (!def || v == null || v === '') return '';
+    var idx = null;
+    if (typeof v === 'number') idx = v;
+    else if (/^\d+$/.test(String(v).trim())) idx = parseInt(String(v).trim(), 10);
+    if (idx != null) return idx > 0 && idx < def.names.length ? def.names[idx] : '';
+
+    var u = String(v).trim().toUpperCase();
+    if (u.indexOf(def.prefix) === 0) u = u.slice(def.prefix.length);
+    var low = u.toLowerCase();
+    return low === 'unspecified' ? '' : low;
+  }
+
+  /* ========================================================================
+   * 3. polyline 解码（GuidePolylineType.POLYLINE_TYPE_DELTA_LATLNG）
+   *    格式：lat0,lng0,dLng1,dLat1,dLng2,dLat2,...
+   *      · 首点为绝对经纬度，纬度在前
+   *      · 其后每两个值为 (Δlng, Δlat)，单位 1e-6 度
+   *      · 元素个数须为偶数且 ≥ 4
+   * ====================================================================== */
+
+  function decodeDeltaLatLng(str) {
+    if (!str) return [];
+    var raw = String(str)
+      .replace(/^\s*\[|\]\s*$/g, '')
+      .split(',');
+    var n = [];
+    for (var i = 0; i < raw.length; i++) {
+      var v = parseFloat(raw[i]);
+      if (!isNaN(v)) n.push(v);
+    }
+    if (n.length < 4 || n.length % 2 !== 0) return [];
+    var lat = n[0];
+    var lng = n[1];
+    var pts = [{ lat: lat, lng: lng }];
+    for (var j = 2; j + 1 < n.length; j += 2) {
+      lng += n[j] / 1e6;
+      lat += n[j + 1] / 1e6;
+      pts.push({ lat: lat, lng: lng });
+    }
+    return pts;
+  }
+
+  /** 按 polyline_type 分派；未登记类型返回空数组（上层降级直连），避免画出乱线 */
+  function decodeTransit(link) {
+    if (!link || !link.polyline) return [];
+    var t = normEnum('polyline_type', link.polyline_type);
+    if (t && t !== 'delta_latlng') {
+      warn('未支持的 polyline_type：' + t + '，该段按无轨迹处理');
+      return [];
+    }
+    return decodeDeltaLatLng(link.polyline);
+  }
+
+  function warn(msg) {
+    if (typeof console !== 'undefined' && console.warn) console.warn('[GuideMap] ' + msg);
+  }
+
+  /* ========================================================================
+   * 4. 数据层：TravelGuideV2 → 扁平模型
+   * ====================================================================== */
+
+  /** 从各种外层包裹中取出 travel_guide 主体 */
+  function pickGuide(input) {
+    if (!isPlainObject(input)) return null;
+    if (input.groups) return input;
+    if (input.travel_guide_v2) return pickGuide(input.travel_guide_v2);
+    if (input.travel_guide) return pickGuide(input.travel_guide);
+    if (input.guide) return pickGuide(input.guide);
+    if (input.data) return pickGuide(input.data);
+    return null;
+  }
+
+  /**
+   * seq_no 稳定升序（不修改入参）。
+   * 规则：从 1 开始；同级同值互为备选，保持书写顺序；0 / 缺省 / 非法值排到末尾。
+   */
+  function sortBySeq(list) {
+    return (list || [])
+      .map(function (item, i) {
+        var n = item && typeof item.seq_no === 'number' ? item.seq_no : parseInt(item && item.seq_no, 10);
+        return { item: item, i: i, seq: !n || isNaN(n) || n <= 0 ? null : n };
+      })
+      .sort(function (a, b) {
+        if (a.seq === b.seq) return a.i - b.i;
+        if (a.seq == null) return 1;
+        if (b.seq == null) return -1;
+        return a.seq - b.seq || a.i - b.i;
+      })
+      .map(function (w) {
+        return w.item;
+      });
+  }
+
+  /**
+   * 平铺分组（parent_group_id 表达父子）→ children 嵌套。
+   * 已是嵌套结构时原样返回；命中平铺时浅拷贝并重写 children；成环组降级为根组。
+   */
+  function buildGroupTree(groups) {
+    var arr = groups || [];
+    var byId = {};
+    var i;
+    for (i = 0; i < arr.length; i++) {
+      if (arr[i] && arr[i].group_id && byId[arr[i].group_id] == null) byId[arr[i].group_id] = i;
+    }
+    var flat = false;
+    for (i = 0; i < arr.length; i++) {
+      var p = arr[i] && arr[i].parent_group_id;
+      if (p && byId[p] != null && byId[p] !== i) {
+        flat = true;
+        break;
+      }
+    }
+    if (!flat) return arr;
+
+    var clones = arr.map(function (x) {
+      var c = merge(x, null);
+      c.children = (x.children || []).slice();
+      return c;
+    });
+
+    function inCycle(start) {
+      var seen = {};
+      var cur = start;
+      var steps = 0;
+      while (cur != null && steps++ <= arr.length) {
+        if (seen[cur]) return true;
+        seen[cur] = 1;
+        var pid = clones[cur].parent_group_id;
+        cur = pid != null ? byId[pid] : null;
+        if (cur === start) return true;
+      }
+      return false;
+    }
+
+    var roots = [];
+    clones.forEach(function (c, idx) {
+      var pIdx = c.parent_group_id != null ? byId[c.parent_group_id] : null;
+      if (pIdx == null || pIdx === idx || inCycle(idx)) roots.push(c);
+      else clones[pIdx].children.push(c);
+    });
+    return roots;
+  }
+
+  function elementType(el) {
+    // ref_type 为 1.0 旧契约，仅作回落
+    return normEnum('element_type', el.element_type) || normEnum('element_type', el.ref_type) || '';
+  }
+
+  function isPointLike(el) {
+    var t = elementType(el);
+    if (!t) return true; // 未声明类型：带 location 即按点处理
+    return POINT_LIKE.indexOf(t) >= 0;
+  }
+
+  function validLocation(loc) {
+    return (
+      isPlainObject(loc) &&
+      typeof loc.lat === 'number' &&
+      typeof loc.lng === 'number' &&
+      Math.abs(loc.lat) <= 90 &&
+      Math.abs(loc.lng) <= 180 &&
+      !(loc.lat === 0 && loc.lng === 0)
+    );
+  }
+
+  /**
+   * 归一化入口。
+   *
+   * @param {Object} input 接口原始响应 / travel_guide / TravelGuideV2
+   * @param {Object} [opts]
+   * @param {Object} [opts.meta] { element_id: {...} } 业务补充字段，挂到 point.extra
+   * @param {boolean} [opts.autoArc=true] 相邻分组无 group_route_to_next 轨迹时补示意弧线
+   * @param {string} [opts.durationUnit='auto'] 'auto' | 'minute' | 'second'
+   * @returns {Object} model
+   */
+  function parse(input, opts) {
+    opts = opts || {};
+    var meta = opts.meta || {};
+    var guide = pickGuide(input);
+    if (!guide) throw new Error('[GuideMap] 未找到指南数据（需含 groups 字段）');
+
+    var model = {
+      guide: guide,
+      title: guide.title || '',
+      subTitle: guide.sub_title || '',
+      brief: guide.brief || '',
+      cover: guide.cover || '',
+      labels: (guide.labels || []).slice(),
+      cities: (guide.city_info || []).slice(),
+      specVersion: guide.spec_version || '',
+      creator: guide.creator || null,
+      groups: [],
+      sections: [], // 容器分组（有子组的那层，站点在子组里），供面板分段展示
+      points: [],
+      links: [],
+      arcs: [],
+      skipped: [], // 被跳过的元素（无坐标 / 线面形态），便于排查数据问题
+      byPoint: {},
+      byGroup: {},
+      bySection: {},
+      durationUnit: opts.durationUnit || 'auto',
+    };
+
+    var seq = 0;
+
+    function pushLink(id, link, fromId, toId, group, scope) {
+      var pts = decodeTransit(link);
+      model.links.push({
+        id: id,
+        kind: pts.length >= 2 ? 'polyline' : 'direct', // 无轨迹 → 两点直连降级
+        scope: scope,
+        mode: link.mode || '',
+        distance: typeof link.distance === 'number' ? link.distance : null,
+        duration: typeof link.duration === 'number' ? link.duration : null,
+        points: pts,
+        fromId: fromId,
+        toId: toId,
+        groupId: group ? group.id : null,
+        groupIndex: group ? group.index : 0,
+        note: (link.note || []).slice(),
+        raw: link,
+      });
+    }
+
+    function walk(rawGroup, depth, path) {
+      // 子组先算出来：有子组的分组自身不参与渲染（站点都在子组里），但它的名字
+      // 往往是这份数据的叙事骨架（「故里求学」「Day 1」），面板要靠它分段
+      var children = sortBySeq(buildGroupTree(rawGroup.children));
+      var gid = rawGroup.group_id || 'g' + (model.groups.length + model.sections.length);
+      var els = sortBySeq(rawGroup.elements);
+
+      if (children.length) {
+        var section = {
+          id: gid,
+          index: model.sections.length,
+          name: rawGroup.group_name || '',
+          type: normEnum('group_type', rawGroup.group_type),
+          subtype: normEnum('group_subtype', rawGroup.subtype),
+          seqNo: rawGroup.seq_no != null ? rawGroup.seq_no : model.sections.length + 1,
+          parentId: rawGroup.parent_group_id || (path.length ? path[path.length - 1].id : ''),
+          depth: depth,
+          path: path.map(function (p) {
+            return p.name;
+          }),
+          pathIds: path.map(function (p) {
+            return p.id;
+          }),
+          groupIds: [], // 子树下所有带站点的分组，walk 结束后统一回填
+          pointIds: [],
+          raw: rawGroup,
+        };
+        model.sections.push(section);
+        model.bySection[section.id] = section;
+      }
+
+      var pointEls = [];
+      els.forEach(function (el) {
+        if (!el) return;
+        if (!isPointLike(el)) {
+          model.skipped.push({ id: el.element_id, reason: 'non-point-type:' + elementType(el) });
+          return;
+        }
+        if (!validLocation(el.location)) {
+          model.skipped.push({ id: el.element_id, reason: 'no-location' });
+          return;
+        }
+        pointEls.push(el);
+      });
+
+      var group = null;
+      if (pointEls.length) {
+        group = {
+          id: gid,
+          index: model.groups.length,
+          name: rawGroup.group_name || '',
+          type: normEnum('group_type', rawGroup.group_type),
+          subtype: normEnum('group_subtype', rawGroup.subtype),
+          orderMode: normEnum('order_mode', rawGroup.elements_policy && rawGroup.elements_policy.order_mode),
+          selectionMode: normEnum(
+            'selection_mode',
+            rawGroup.children_policy && rawGroup.children_policy.selection_mode,
+          ),
+          seqNo: rawGroup.seq_no != null ? rawGroup.seq_no : model.groups.length + 1,
+          parentId: rawGroup.parent_group_id || (path.length ? path[path.length - 1].id : ''),
+          depth: depth,
+          path: path.map(function (p) {
+            return p.name;
+          }),
+          pathIds: path.map(function (p) {
+            return p.id;
+          }),
+          pointIds: [],
+          raw: rawGroup,
+        };
+        model.groups.push(group);
+        model.byGroup[group.id] = group;
+
+        pointEls.forEach(function (el, i) {
+          var id = el.element_id || gid + '_e' + i;
+          var role = normEnum('role', el.role) || 'main';
+          var point = {
+            id: id,
+            // role=marker 为功能标记，不占序号
+            seq: role === 'marker' ? null : ++seq,
+            seqInGroup: i + 1,
+            title: el.title || '',
+            intro: el.intro || '',
+            desc: el.desc || '',
+            category: el.category || '',
+            note: el.note || null,
+            lat: el.location.lat,
+            lng: el.location.lng,
+            type: elementType(el) || 'poi',
+            role: role,
+            refId: el.ref_id || '',
+            richInfo: el.rich_info || null,
+            addressInfo: el.address_info || null,
+            groupId: group.id,
+            groupIndex: group.index,
+            groupName: group.name,
+            extra: meta[id] || {},
+            raw: el,
+          };
+          model.points.push(point);
+          model.byPoint[id] = point;
+          group.pointIds.push(id);
+
+          // 组内连线：本元素 → 组内下一元素
+          var link = el.attachment && el.attachment.route_to_next;
+          var next = pointEls[i + 1];
+          if (link && next) {
+            pushLink('el_' + id, link, id, next.element_id || gid + '_e' + (i + 1), group, 'element');
+          }
+        });
+      }
+
+      // 子组递归（proto 约定深度 ≤ 5），兼容平铺 parent_group_id
+      children.forEach(function (child) {
+        walk(child, depth + 1, path.concat([{ id: gid, name: rawGroup.group_name || gid }]));
+      });
+    }
+
+    sortBySeq(buildGroupTree(guide.groups)).forEach(function (g) {
+      walk(g, 0, []);
+    });
+
+    /* 容器层回填：每个带站点的分组计入它的全部祖先容器。
+       groups 是深度优先推进去的，所以 groupIds / pointIds 天然是阅读顺序。 */
+    model.groups.forEach(function (g) {
+      var owners = model.bySection[g.id] ? g.pathIds.concat([g.id]) : g.pathIds;
+      owners.forEach(function (sid) {
+        var sec = model.bySection[sid];
+        if (!sec) return;
+        sec.groupIds.push(g.id);
+        sec.pointIds = sec.pointIds.concat(g.pointIds);
+      });
+    });
+
+    /* 组间连线：写在「前一个」分组的 attachment.group_route_to_next 上 */
+    var autoArc = opts.autoArc !== false;
+    for (var i = 0; i < model.groups.length - 1; i++) {
+      var cur = model.groups[i];
+      var nxt = model.groups[i + 1];
+      var a = model.byPoint[cur.pointIds[cur.pointIds.length - 1]];
+      var b = model.byPoint[nxt.pointIds[0]];
+      if (!a || !b) continue;
+      var gl = cur.raw.attachment && cur.raw.attachment.group_route_to_next;
+      if (gl && decodeTransit(gl).length >= 2) {
+        pushLink('gp_' + cur.id, gl, a.id, b.id, nxt, 'group');
+      } else if (autoArc) {
+        model.arcs.push({
+          id: 'arc_' + cur.id,
+          fromId: a.id,
+          toId: b.id,
+          groupId: nxt.id,
+          groupIndex: nxt.index,
+          mode: (gl && gl.mode) || '',
+          distance: (gl && gl.distance) || null,
+          duration: (gl && gl.duration) || null,
+        });
+      }
+    }
+
+    /* 跨分组关系：仅 transit 且 ext 内带 polyline 时成线 */
+    (guide.cross_group_relations || []).forEach(function (rel, k) {
+      if (normEnum('relation_type', rel.relation_type) !== 'transit' || !rel.ext) return;
+      var ext;
+      try {
+        ext = typeof rel.ext === 'string' ? JSON.parse(rel.ext) : rel.ext;
+      } catch (e) {
+        warn('cross_group_relations[' + k + '].ext 不是合法 JSON，已忽略');
+        return;
+      }
+      if (!isPlainObject(ext)) return;
+      var from = model.byPoint[rel.from_element_id];
+      pushLink(
+        'rel_' + (rel.relation_id || k),
+        ext,
+        rel.from_element_id,
+        rel.to_element_id,
+        from ? model.byGroup[from.groupId] : null,
+        'relation',
+      );
+    });
+
+    if (!model.cities.length) {
+      var set = {};
+      model.points.forEach(function (p) {
+        var city = (p.addressInfo && p.addressInfo.city) || p.extra.city;
+        if (city) set[city] = 1;
+      });
+      model.cities = Object.keys(set);
+    }
+
+    return model;
+  }
+
+  /**
+   * 分组层级概览：每一层多少个、这层是什么语义。
+   * 面板写「N 个阶段 · M 座城市」这类统计时按它取数——按 type 去 groups 里过滤
+   * 拿不到容器层（容器分组不带站点，不在 groups 里），会写出「0 个阶段」这种反话。
+   */
+  function levelsOf(model) {
+    var byDepth = {};
+    var order = [];
+    model.sections.concat(model.groups).forEach(function (g) {
+      var d = g.depth || 0;
+      if (!byDepth[d]) {
+        byDepth[d] = { depth: d, count: 0, seen: {}, types: {} };
+        order.push(d);
+      }
+      var lv = byDepth[d];
+      if (lv.seen[g.id]) return; // 既带站点又有子组的分组在两个列表里各出现一次
+      lv.seen[g.id] = 1;
+      lv.count++;
+      if (g.type) lv.types[g.type] = (lv.types[g.type] || 0) + 1;
+    });
+    return order
+      .sort(function (a, b) {
+        return a - b;
+      })
+      .map(function (d) {
+        var lv = byDepth[d];
+        var top = Object.keys(lv.types).sort(function (a, b) {
+          return lv.types[b] - lv.types[a];
+        })[0] || '';
+        return {
+          depth: d,
+          type: top,
+          typeLabel: GROUP_TYPE_LABEL[top] || '分组',
+          count: lv.count,
+        };
+      });
+  }
+
+  /** 统计摘要（纯数据，可脱离地图使用） */
+  function summarize(model) {
+    var dist = 0;
+    var dur = 0;
+    var measured = 0;
+    model.links.forEach(function (l) {
+      if (typeof l.distance === 'number') {
+        dist += l.distance;
+        measured++;
+      }
+      if (typeof l.duration === 'number') dur += l.duration;
+    });
+    return {
+      groupCount: model.groups.length,
+      sectionCount: model.sections.length,
+      levels: levelsOf(model),
+      pointCount: model.points.length,
+      linkCount: model.links.length,
+      arcCount: model.arcs.length,
+      cities: model.cities.slice(),
+      totalDistance: dist,
+      totalDistanceText: fmtDistance(dist),
+      totalDuration: dur,
+      totalDurationText: fmtDuration(dur, model.durationUnit === 'auto' ? 'minute' : model.durationUnit),
+      measuredSegments: measured,
+    };
+  }
+
+  /* ========================================================================
+   * 5. 内置标记图形
+   * ====================================================================== */
+
+  var PIN_SHAPES = {
+    /** 水滴 + 序号（锚点在针尖） */
+    pin: function (ctx) {
+      var c = ctx.color;
+      var s = ctx.scale;
+      var w = Math.round(34 * s);
+      var h = Math.round(44 * s);
+      var svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        w +
+        '" height="' +
+        h +
+        '" viewBox="0 0 34 44">' +
+        '<path d="M17 1.6C9 1.6 2.5 8 2.5 16c0 10.2 11.9 24.6 13.4 26.4a1 1 0 0 0 1.6 0C18.9 40.6 31.5 26.2 31.5 16 31.5 8 25 1.6 17 1.6z" fill="' +
+        c +
+        '" stroke="#fff" stroke-width="' +
+        (ctx.active ? 4 : 2.6) +
+        '"/>' +
+        '<circle cx="17" cy="16" r="8.4" fill="#fff"/>' +
+        (ctx.text
+          ? '<text x="17" y="20" font-family="Helvetica,Arial,sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="' +
+            c +
+            '">' +
+            esc(ctx.text) +
+            '</text>'
+          : '') +
+        '</svg>';
+      return { src: svgURI(svg), width: w, height: h, anchor: { x: w / 2, y: h - 1 } };
+    },
+
+    /** 实心圆 + 序号（锚点居中） */
+    circle: function (ctx) {
+      var d = Math.round(30 * ctx.scale);
+      var svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        d +
+        '" height="' +
+        d +
+        '" viewBox="0 0 30 30">' +
+        (ctx.active ? '<circle cx="15" cy="15" r="14" fill="' + withAlpha(ctx.color, 0.25) + '"/>' : '') +
+        '<circle cx="15" cy="15" r="11.6" fill="' +
+        ctx.color +
+        '" stroke="#fff" stroke-width="' +
+        (ctx.active ? 3.4 : 2.4) +
+        '"/>' +
+        (ctx.text
+          ? '<text x="15" y="19.3" font-family="Helvetica,Arial,sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#fff">' +
+            esc(ctx.text) +
+            '</text>'
+          : '') +
+        '</svg>';
+      return { src: svgURI(svg), width: d, height: d, anchor: { x: d / 2, y: d / 2 } };
+    },
+
+    /** 小圆点（密集点场景） */
+    dot: function (ctx) {
+      var d = Math.round(16 * ctx.scale);
+      var svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+        d +
+        '" height="' +
+        d +
+        '" viewBox="0 0 16 16">' +
+        '<circle cx="8" cy="8" r="5.6" fill="' +
+        ctx.color +
+        '" stroke="#fff" stroke-width="' +
+        (ctx.active ? 3 : 2) +
+        '"/></svg>';
+      return { src: svgURI(svg), width: d, height: d, anchor: { x: d / 2, y: d / 2 } };
+    },
+  };
+
+  /* ========================================================================
+   * 6. 默认配置
+   * ====================================================================== */
+
+  var DEFAULTS = {
+    container: 'map',
+    data: null, // 指南数据（任意外层包裹）
+    meta: {}, // { element_id: {...} } 业务补充字段
+    durationUnit: 'auto',
+    autoArc: true,
+
+    map: {
+      zoom: 5,
+      pitch: 0,
+      rotation: 0,
+      center: null, // 缺省由 fitBounds 决定
+      viewMode: '2D',
+      showControl: true,
+      mapStyleId: null,
+      baseMap: null,
+    },
+
+    theme: {
+      palette: [], // 留空则全部分组同色
+      groupColors: {}, // { group_id: '#rrggbb' } 优先级高于 palette
+    },
+
+    marker: {
+      enable: true,
+      zIndex: 100,
+      shape: 'pin', // 'pin' | 'circle' | 'dot' | function(ctx)->{src,width,height,anchor}
+      icon: null, // { src,width,height,anchor } 或 function(point, ctx)
+      text: 'seq', // 'seq' | 'seqInGroup' | 'none' | function(point)->string
+      label: 'title', // 'title' | 'none' | function(point)->string
+      labelStyle: {
+        color: '#2b2b2b',
+        strokeColor: 'rgba(255,255,255,0.95)',
+        strokeWidth: 4,
+        size: 12,
+        direction: 'bottom',
+        offset: { x: 0, y: 2 },
+        wrapOptions: { maxWidth: 108, maxLineCount: 2, rowSpacing: 2 },
+      },
+      activeScale: 1.3,
+      sideOpacity: 0.78,
+      collision: { sameSource: true, crossSource: true },
+    },
+
+    route: {
+      enable: true,
+      zIndex: 10,
+      colorBy: 'group', // 'group' | 'mode' | function(link)->color
+      modeColors: {},
+      style: {
+        // width 须为正整数、borderWidth 须为非负整数，否则 JSAPI 判为无效属性
+        width: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.92)',
+        lineCap: 'round',
+        showArrow: true,
+        arrowOptions: { width: 5, height: 7, space: 64, animSpeed: 26 },
+      },
+      modeWidthPreset: true,
+      directStyle: { width: 2, showArrow: false, dashArray: [8, 8] },
+      styleOf: null, // function(link, baseStyle)->styleOptions
+    },
+
+    arc: {
+      /**
+       * 飞线（跨组迁徙示意线）是否展示。默认 false —— 飞线只是「两组之间有迁徙」
+       * 的示意，不代表真实路径，容易被误读为实际轨迹，因此需显式开启。
+       *   false                     全部不展示（默认）
+       *   true                      全部展示
+       *   function(arc, ctx)->bool  逐条判定，ctx = { api, from, to, fromGroup, toGroup }
+       * 运行时可用 setArcEnable() 改写。
+       */
+      enable: false,
+      zIndex: 6,
+      mode: 'horizontal', // 'horizontal' 贴地 | 'vertical' 立面
+      curvature: 0.5,
+      width: 2.6,
+      opacity: 0.42,
+      animation: { enable: true, animationType: 'flow', duration: 3200, tailFactor: 0.35, yoyo: false },
+      fallbackStyle: { width: 2, showArrow: false, dashArray: [10, 10] },
+    },
+
+    infoWindow: {
+      enable: true,
+      offset: { x: 0, y: -46 },
+      autoOpenOnSelect: true,
+      render: null, // function(point, ctx)->html
+    },
+
+    fitBounds: {
+      padding: { top: 84, right: 124, bottom: 84, left: 72 },
+      includeRoutes: true,
+      includeArcs: false, // 示意弧线会大幅拉偏视野
+      maxZoom: null,
+      duration: 700,
+    },
+
+    focus: { zoom: 13.6, duration: 1000, pitch: null },
+    tour: { interval: 3200, autoFocus: true, loop: false },
+  };
+
+  /* ========================================================================
+   * 7. 组件主体
+   * ====================================================================== */
+
+  /**
+   * @param {Object} options 见 DEFAULTS
+   */
+  function GuideMap(options) {
+    if (!(this instanceof GuideMap)) return new GuideMap(options);
+    if (typeof TMap === 'undefined') {
+      throw new Error('[GuideMap] 未检测到 TMap，请先引入腾讯地图 JSAPI GL');
+    }
+
+    var cfg = (this.options = merge(DEFAULTS, options || {}));
+    // 记录用户显式传入的线型，用于压过内置出行方式预设
+    this._userRouteStyle = (options && options.route && options.route.style) || null;
+
+    var el = typeof cfg.container === 'string' ? document.getElementById(cfg.container) : cfg.container;
+    if (!el) throw new Error('[GuideMap] 容器不存在：' + cfg.container);
+    this.container = el;
+
+    var model = (this.model = parse(cfg.data, {
+      meta: cfg.meta,
+      autoArc: cfg.autoArc,
+      durationUnit: cfg.durationUnit,
+    }));
+    if (!model.points.length) throw new Error('[GuideMap] 指南中没有可渲染的坐标点');
+
+    // 预构造 LatLng，避免渲染时反复 new
+    model.points.forEach(function (p) {
+      p.pos = new TMap.LatLng(p.lat, p.lng);
+    });
+    model.links.forEach(function (l) {
+      l.path =
+        l.kind === 'polyline'
+          ? l.points.map(function (p) {
+              return new TMap.LatLng(p.lat, p.lng);
+            })
+          : null;
+    });
+
+    // 分组配色
+    var palette = cfg.theme.palette || [];
+    var colors = (this.colors = {});
+    model.groups.forEach(function (g) {
+      // 统一归一：调用方可以传 hsl()，但交给 TMap 的必须是 rgb()/rgba()/#RRGGBB
+      colors[g.id] = normColor(
+        cfg.theme.groupColors[g.id] || (palette.length ? palette[g.index % palette.length] : DEFAULT_COLOR),
+      );
+    });
+
+    this.active = {};
+    model.groups.forEach(function (g) {
+      this.active[g.id] = true;
+    }, this);
+
+    this.currentId = null;
+    this._events = {};
+    this._tour = { playing: false, timer: null, idx: 0 };
+    this._markerStyles = {};
+    this._markerStyleKeys = {};
+    this._routeStyles = {};
+    this._routeStyleKeys = {};
+    this._styleSeq = 0;
+
+    var mapOpts = {
+      zoom: cfg.map.zoom,
+      pitch: cfg.map.pitch,
+      rotation: cfg.map.rotation,
+      viewMode: cfg.map.viewMode,
+      showControl: cfg.map.showControl,
+      center: cfg.map.center ? new TMap.LatLng(cfg.map.center.lat, cfg.map.center.lng) : model.points[0].pos,
+    };
+    if (cfg.map.mapStyleId) mapOpts.mapStyleId = cfg.map.mapStyleId;
+    if (cfg.map.baseMap) mapOpts.baseMap = cfg.map.baseMap;
+    this.map = new TMap.Map(el, mapOpts);
+
+    this._buildLayers();
+    this.render();
+    this.resetView(true);
+
+    var self = this;
+    setTimeout(function () {
+      self.emit('ready', self);
+    }, 0);
+  }
+
+  /* ---- 事件 ------------------------------------------------------------ */
+
+  GuideMap.prototype.on = function (name, fn) {
+    (this._events[name] || (this._events[name] = [])).push(fn);
+    return this;
+  };
+
+  GuideMap.prototype.off = function (name, fn) {
+    var list = this._events[name];
+    if (!list) return this;
+    if (!fn) delete this._events[name];
+    else
+      this._events[name] = list.filter(function (f) {
+        return f !== fn;
+      });
+    return this;
+  };
+
+  GuideMap.prototype.emit = function (name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    (this._events[name] || []).forEach(function (fn) {
+      try {
+        fn.apply(null, args);
+      } catch (e) {
+        warn('事件回调异常（' + name + '）：' + e.message);
+      }
+    });
+    return this;
+  };
+
+  /* ---- 图层 ------------------------------------------------------------ */
+
+  GuideMap.prototype._buildLayers = function () {
+    var self = this;
+    var cfg = this.options;
+
+    if (cfg.route.enable) {
+      this.lineLayer = new TMap.MultiPolyline({
+        id: 'gm-routes',
+        map: this.map,
+        zIndex: cfg.route.zIndex,
+        styles: {},
+        geometries: [],
+      });
+      this.lineLayer.on('click', function (evt) {
+        if (evt && evt.geometry) self.emit('link:click', self.getLink(evt.geometry.id), self);
+      });
+    }
+
+    if (cfg.marker.enable) {
+      var opt = {
+        id: 'gm-markers',
+        map: this.map,
+        zIndex: cfg.marker.zIndex,
+        styles: {},
+        geometries: [],
+      };
+      if (cfg.marker.collision) opt.collisionOptions = cfg.marker.collision;
+      this.markerLayer = new TMap.MultiMarker(opt);
+      this.markerLayer.on('click', function (evt) {
+        if (!evt || !evt.geometry) return;
+        self.stop();
+        self.select(evt.geometry.id, { focus: false });
+      });
+    }
+
+    // 飞线图层不在这里创建：默认关闭，等真的有要展示的飞线时再惰性构建
+    // （见 _ensureArcLayer），避免为一个默认不用的能力付出初始化成本。
+
+    if (cfg.infoWindow.enable) {
+      this.infoWindow = new TMap.InfoWindow({
+        map: this.map,
+        position: this.model.points[0].pos,
+        offset: cfg.infoWindow.offset,
+        content: ' ',
+        enableCustom: false,
+      });
+      this.infoWindow.close();
+    }
+  };
+
+  /* ---- 飞线（跨组迁徙示意线） ------------------------------------------ */
+
+  /** 飞线能力是否开启（未逐条判定，仅看总开关是否非 false） */
+  GuideMap.prototype._arcEnabled = function () {
+    var e = this.options.arc.enable;
+    return isFn(e) ? true : !!e;
+  };
+
+  /**
+   * 单条飞线是否展示：总开关开启 + 两端分组均可见 +（若为函数）谓词通过。
+   * 谓词异常时按不展示处理，避免一条坏判定导致整层渲染中断。
+   */
+  GuideMap.prototype._arcVisible = function (arc) {
+    if (!this._arcEnabled()) return false;
+    var from = this.model.byPoint[arc.fromId];
+    var to = this.model.byPoint[arc.toId];
+    if (!from || !to) return false;
+    if (!this.isActive(from.groupId) || !this.isActive(to.groupId)) return false;
+
+    var e = this.options.arc.enable;
+    if (!isFn(e)) return true;
+    try {
+      return !!e(arc, {
+        api: this,
+        from: from,
+        to: to,
+        fromGroup: this.model.byGroup[from.groupId] || null,
+        toGroup: this.model.byGroup[to.groupId] || null,
+      });
+    } catch (err) {
+      warn('arc.enable 判定异常，该条飞线不展示：' + err.message);
+      return false;
+    }
+  };
+
+  /** 当前需要展示的飞线 */
+  GuideMap.prototype.getVisibleArcs = function () {
+    var self = this;
+    return this.model.arcs.filter(function (a) {
+      return self._arcVisible(a);
+    });
+  };
+
+  /** 惰性创建飞线图层；无 visualization 库时降级为虚线折线 */
+  GuideMap.prototype._ensureArcLayer = function () {
+    if (this.arcLayer || this.arcFallbackLayer) return;
+    var self = this;
+    var cfg = this.options;
+
+    if (TMap.visualization && TMap.visualization.Arc) {
+      this.arcLayer = new TMap.visualization.Arc({
+        mode: cfg.arc.mode,
+        curvature: cfg.arc.curvature,
+        zIndex: cfg.arc.zIndex,
+        pickStyle: function (item) {
+          var c = self.colorOf(item.properties && item.properties.groupId);
+          return {
+            color: withAlpha(c, cfg.arc.opacity),
+            animateColor: withAlpha(c, 0.95),
+            width: cfg.arc.width,
+          };
+        },
+        processAnimation: cfg.arc.animation,
+      }).addTo(this.map);
+    } else {
+      warn('未加载 visualization 附加库，飞线降级为虚线折线');
+      var styles = {};
+      this.model.arcs.forEach(function (a) {
+        styles['arc_' + a.groupId] = new TMap.PolylineStyle(
+          sanitizePolylineStyle(
+            merge({ color: withAlpha(self.colorOf(a.groupId), cfg.arc.opacity), borderWidth: 0 }, cfg.arc.fallbackStyle),
+          ),
+        );
+      });
+      this.arcFallbackLayer = new TMap.MultiPolyline({
+        id: 'gm-arcs',
+        map: this.map,
+        zIndex: cfg.arc.zIndex,
+        styles: styles,
+        geometries: [],
+      });
+    }
+  };
+
+  /**
+   * 运行时切换飞线展示策略。
+   * @param {boolean|Function} v false 全关 / true 全开 / function(arc, ctx)->boolean 逐条判定
+   * @param {boolean} [skipFit] 是否跳过视野重算
+   */
+  GuideMap.prototype.setArcEnable = function (v, skipFit) {
+    this.options.arc.enable = v;
+    this.render();
+    // 飞线可能参与视野计算（fitBounds.includeArcs），开关后需要重算
+    if (!skipFit && this.options.fitBounds.includeArcs && this.currentId == null) this.resetView();
+    this.emit('arc:toggle', this.getVisibleArcs(), this);
+    return this;
+  };
+
+  GuideMap.prototype.isArcEnabled = function () {
+    return this._arcEnabled();
+  };
+
+  /* ---- 样式 ------------------------------------------------------------ */
+
+  GuideMap.prototype._markerText = function (point) {
+    var t = this.options.marker.text;
+    if (t === 'none') return '';
+    if (isFn(t)) return String(t(point) == null ? '' : t(point));
+    var v = point[t];
+    return v == null ? '' : String(v);
+  };
+
+  GuideMap.prototype._markerLabel = function (point) {
+    var l = this.options.marker.label;
+    if (l === 'none') return undefined;
+    if (isFn(l)) return l(point);
+    return point[l] || point.title;
+  };
+
+  /** 相同外观复用同一个 styleId，避免图层样式表随点数线性膨胀 */
+  GuideMap.prototype._markerStyleId = function (point, active) {
+    var mk = this.options.marker;
+    var color = this.colorOf(point.groupId);
+    var text = this._markerText(point);
+    var hasLabel = this._markerLabel(point) !== undefined;
+    var key = ['m', color, text, active ? 1 : 0, point.role, hasLabel ? 1 : 0].join('|');
+    if (this._markerStyleKeys[key]) return this._markerStyleKeys[key];
+
+    var id = 'ms' + ++this._styleSeq;
+    this._markerStyleKeys[key] = id;
+
+    var scale = active ? mk.activeScale : 1;
+    var base;
+    var icon = isFn(mk.icon) ? mk.icon(point, { active: active, color: color }) : mk.icon;
+    if (icon && icon.src) {
+      var w = (icon.width || 34) * scale;
+      var h = (icon.height || 44) * scale;
+      base = {
+        src: icon.src,
+        width: w,
+        height: h,
+        anchor: icon.anchor ? { x: icon.anchor.x * scale, y: icon.anchor.y * scale } : { x: w / 2, y: h },
+      };
+    } else {
+      var shape = isFn(mk.shape) ? mk.shape : PIN_SHAPES[mk.shape] || PIN_SHAPES.pin;
+      base = shape({ color: color, text: text, active: active, scale: scale, point: point });
+    }
+
+    var style = merge(mk.labelStyle, {
+      width: base.width,
+      height: base.height,
+      anchor: base.anchor,
+      src: base.src,
+    });
+    if (!hasLabel) style.size = 0;
+    if (active) style.color = '#111';
+    if (point.role === 'side') style.opacity = mk.sideOpacity;
+
+    this._markerStyles[id] = new TMap.MarkerStyle(style);
+    return id;
+  };
+
+  GuideMap.prototype._routeStyleId = function (link) {
+    var rc = this.options.route;
+    var color;
+    if (isFn(rc.colorBy)) color = rc.colorBy(link);
+    else if (rc.colorBy === 'mode') color = rc.modeColors[link.mode] || this.colorOf(link.groupId);
+    else color = this.colorOf(link.groupId);
+    color = normColor(color);
+
+    var key = ['l', color, link.mode, link.kind, link.scope].join('|');
+    // styleOf 为完全自定义，无法参与 key 归并，按 link.id 单独成键
+    if (isFn(rc.styleOf)) key += '|' + link.id;
+    if (this._routeStyleKeys[key]) return this._routeStyleKeys[key];
+
+    var id = 'ls' + ++this._styleSeq;
+    this._routeStyleKeys[key] = id;
+
+    // 优先级（低 → 高）：缺省 → 出行方式线宽预设 → 用户显式 style → 直连降级 → styleOf
+    var style = merge(rc.style, null);
+    if (rc.modeWidthPreset && MODE_WIDTH[link.mode]) style.width = MODE_WIDTH[link.mode];
+    if (this._userRouteStyle) style = merge(style, this._userRouteStyle);
+    style.color = color;
+    if (link.kind === 'direct') {
+      style = merge(style, rc.directStyle);
+      style.color = withAlpha(color, 0.65);
+    }
+    if (isFn(rc.styleOf)) {
+      var custom = rc.styleOf(link, style);
+      if (custom) style = merge(style, custom);
+    }
+
+    this._routeStyles[id] = new TMap.PolylineStyle(sanitizePolylineStyle(style));
+    return id;
+  };
+
+  /* ---- 可见性 ---------------------------------------------------------- */
+
+  GuideMap.prototype.isActive = function (groupId) {
+    return groupId == null ? true : !!this.active[groupId];
+  };
+
+  /** 连线可见：两端点所属分组均开启（端点缺失时回落到连线自身分组） */
+  GuideMap.prototype._linkVisible = function (link) {
+    var a = this.model.byPoint[link.fromId];
+    var b = this.model.byPoint[link.toId];
+    if (a && !this.isActive(a.groupId)) return false;
+    if (b && !this.isActive(b.groupId)) return false;
+    if (!a && !b) return this.isActive(link.groupId);
+    return true;
+  };
+
+  /* ---- 渲染 ------------------------------------------------------------ */
+
+  GuideMap.prototype.render = function () {
+    var self = this;
+    var model = this.model;
+
+    if (this.lineLayer) {
+      var lines = [];
+      model.links.forEach(function (l) {
+        if (!self._linkVisible(l)) return;
+        var paths = l.path;
+        if (!paths) {
+          var a = model.byPoint[l.fromId];
+          var b = model.byPoint[l.toId];
+          if (!a || !b) return;
+          paths = [a.pos, b.pos];
+        }
+        lines.push({ id: l.id, styleId: self._routeStyleId(l), paths: paths, properties: { groupId: l.groupId } });
+      });
+      this.lineLayer.setStyles(this._routeStyles);
+      this.lineLayer.setGeometries(lines);
+    }
+
+    if (this.markerLayer) {
+      var geoms = model.points
+        .filter(function (p) {
+          return self.isActive(p.groupId);
+        })
+        .map(function (p) {
+          var on = self.currentId === p.id;
+          var g = {
+            id: p.id,
+            styleId: self._markerStyleId(p, on),
+            position: p.pos,
+            rank: on ? 9999 : p.seq || 1,
+            properties: { groupId: p.groupId, seq: p.seq, title: p.title },
+          };
+          var label = self._markerLabel(p);
+          if (label !== undefined) g.content = label;
+          return g;
+        });
+      this.markerLayer.setStyles(this._markerStyles);
+      this.markerLayer.setGeometries(geoms);
+    }
+
+    var arcs = this.getVisibleArcs();
+    // 有要画的飞线才建层；已建层但当前无可见飞线时清空数据（不销毁，便于再次开启）
+    if (arcs.length) this._ensureArcLayer();
+    if (this.arcLayer) {
+      this.arcLayer.setData(
+        arcs.map(function (a) {
+          return {
+            from: model.byPoint[a.fromId].pos,
+            to: model.byPoint[a.toId].pos,
+            properties: { id: a.id, groupId: a.groupId },
+          };
+        }),
+      );
+    } else if (this.arcFallbackLayer) {
+      this.arcFallbackLayer.setGeometries(
+        arcs.map(function (a) {
+          return {
+            id: a.id,
+            styleId: 'arc_' + a.groupId,
+            paths: [model.byPoint[a.fromId].pos, model.byPoint[a.toId].pos],
+          };
+        }),
+      );
+    }
+    return this;
+  };
+
+  /* ---- 视野 ------------------------------------------------------------ */
+
+  /** 当前可见要素的包围盒；无可见要素返回 null */
+  GuideMap.prototype.getBounds = function () {
+    var self = this;
+    var model = this.model;
+    var fb = this.options.fitBounds;
+    var bounds = null;
+
+    function extend(pos) {
+      bounds = bounds ? bounds.extend(pos) : new TMap.LatLngBounds(pos, pos);
+    }
+
+    model.points.forEach(function (p) {
+      if (self.isActive(p.groupId)) extend(p.pos);
+    });
+
+    if (fb.includeRoutes) {
+      model.links.forEach(function (l) {
+        if (!l.path || !self._linkVisible(l)) return;
+        for (var i = 0; i < l.path.length; i++) extend(l.path[i]);
+      });
+    }
+
+    if (fb.includeArcs) {
+      // 复用 _arcVisible，确保被 arc.enable 谓词排除的飞线不影响视野
+      this.getVisibleArcs().forEach(function (a) {
+        extend(model.byPoint[a.fromId].pos);
+        extend(model.byPoint[a.toId].pos);
+      });
+    }
+    return bounds;
+  };
+
+  /** 回到全景；immediate=true 不走缓动（首屏用） */
+  GuideMap.prototype.resetView = function (immediate) {
+    var fb = this.options.fitBounds;
+    this.currentId = null;
+    if (this.infoWindow) this.infoWindow.close();
+    this.render();
+    var b = this.getBounds();
+    if (!b) return this;
+    var opt = { padding: fb.padding };
+    if (fb.maxZoom != null) opt.maxZoom = fb.maxZoom;
+    if (!immediate) opt.ease = { duration: fb.duration };
+    this.map.fitBounds(b, opt);
+    return this;
+  };
+
+  /** 平滑飞到某个点 */
+  GuideMap.prototype.focus = function (id) {
+    var p = this.model.byPoint[id];
+    if (!p) return this;
+    var f = this.options.focus;
+    var status = { center: p.pos, zoom: f.zoom };
+    if (f.pitch != null) status.pitch = f.pitch;
+    this.map.easeTo(status, { duration: f.duration });
+    return this;
+  };
+
+  /** 把视野收敛到单个分组 */
+  GuideMap.prototype.fitGroup = function (groupId) {
+    var group = this.model.byGroup[groupId];
+    if (!group) return this;
+    var self = this;
+    var bounds = null;
+    group.pointIds.forEach(function (id) {
+      var pos = self.model.byPoint[id].pos;
+      bounds = bounds ? bounds.extend(pos) : new TMap.LatLngBounds(pos, pos);
+    });
+    this.model.links.forEach(function (l) {
+      if (l.groupId !== groupId || !l.path) return;
+      l.path.forEach(function (pos) {
+        bounds = bounds ? bounds.extend(pos) : new TMap.LatLngBounds(pos, pos);
+      });
+    });
+    if (bounds) {
+      this.map.fitBounds(bounds, {
+        padding: this.options.fitBounds.padding,
+        ease: { duration: this.options.fitBounds.duration },
+      });
+    }
+    return this;
+  };
+
+  /* ---- 选中与信息窗 ---------------------------------------------------- */
+
+  GuideMap.prototype._infoHTML = function (point) {
+    var cfg = this.options;
+    var ctx = {
+      color: this.colorOf(point.groupId),
+      esc: esc,
+      fmtDistance: fmtDistance,
+      fmtDuration: fmtDuration,
+      api: this,
+    };
+    if (isFn(cfg.infoWindow.render)) return cfg.infoWindow.render(point, ctx);
+
+    var badge = point.extra.badge || (point.seq != null ? '第 ' + point.seq + ' 站' : TYPE_LABEL[point.type] || '');
+    var sub = point.extra.subtitle || point.groupName;
+    var body = point.intro || point.desc || '';
+    var noteText = point.note && point.note.text ? point.note.text : '';
+    var out = this.getOutboundLink(point.id);
+    var foot = '';
+    if (out) {
+      foot = [
+        '下一站',
+        MODE_LABEL[out.mode] || out.mode,
+        fmtDistance(out.distance),
+        fmtDuration(out.duration, this.model.durationUnit),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+    }
+
+    return (
+      '<div class="gm-iw">' +
+      (badge ? '<span class="gm-iw-badge" style="background:' + ctx.color + '">' + esc(badge) + '</span>' : '') +
+      '<p class="gm-iw-title">' +
+      esc(point.title) +
+      '</p>' +
+      (sub ? '<p class="gm-iw-sub" style="color:' + ctx.color + '">' + esc(sub) + '</p>' : '') +
+      (body ? '<p class="gm-iw-body">' + esc(body) + '</p>' : '') +
+      (noteText ? '<p class="gm-iw-note">' + esc(noteText) + '</p>' : '') +
+      (foot ? '<div class="gm-iw-foot">' + esc(foot) + '</div>' : '') +
+      '</div>'
+    );
+  };
+
+  /**
+   * 选中一个点。
+   * @param {string} id element_id
+   * @param {{focus?:boolean, openInfo?:boolean, silent?:boolean}} [opt]
+   */
+  GuideMap.prototype.select = function (id, opt) {
+    opt = opt || {};
+    var p = this.model.byPoint[id];
+    if (!p) return this;
+    if (!this.isActive(p.groupId)) this.setGroupActive(p.groupId, true, true);
+
+    this.currentId = id;
+    this.render();
+    if (opt.focus !== false) this.focus(id);
+
+    var openInfo = opt.openInfo != null ? opt.openInfo : this.options.infoWindow.autoOpenOnSelect;
+    if (this.infoWindow && openInfo) {
+      this.infoWindow.setPosition(p.pos);
+      this.infoWindow.setContent(this._infoHTML(p));
+      this.infoWindow.open();
+    }
+    if (!opt.silent) this.emit('select', p, this);
+    return this;
+  };
+
+  GuideMap.prototype.clearSelection = function () {
+    this.currentId = null;
+    if (this.infoWindow) this.infoWindow.close();
+    this.render();
+    this.emit('select', null, this);
+    return this;
+  };
+
+  /* ---- 分组筛选 -------------------------------------------------------- */
+
+  GuideMap.prototype.setGroupActive = function (groupId, on, skipFit) {
+    if (!this.model.byGroup[groupId]) return this;
+    this.active[groupId] = !!on;
+    return this._afterFilter(skipFit);
+  };
+
+  GuideMap.prototype.toggleGroup = function (groupId, skipFit) {
+    return this.setGroupActive(groupId, !this.active[groupId], skipFit);
+  };
+
+  GuideMap.prototype.setActiveGroups = function (ids, skipFit) {
+    var set = {};
+    (ids || []).forEach(function (i) {
+      set[i] = 1;
+    });
+    this.model.groups.forEach(function (g) {
+      this.active[g.id] = !!set[g.id];
+    }, this);
+    return this._afterFilter(skipFit);
+  };
+
+  /** 独占显示某分组；showAllGroups() 恢复 */
+  GuideMap.prototype.soloGroup = function (groupId, skipFit) {
+    if (!this.model.byGroup[groupId]) return this;
+    this.model.groups.forEach(function (g) {
+      this.active[g.id] = g.id === groupId;
+    }, this);
+    return this._afterFilter(skipFit);
+  };
+
+  GuideMap.prototype.showAllGroups = function (skipFit) {
+    this.model.groups.forEach(function (g) {
+      this.active[g.id] = true;
+    }, this);
+    return this._afterFilter(skipFit);
+  };
+
+  /**
+   * 独占显示某个容器分组（阶段 / 大分组）下的全部子组。
+   * 面板上点「故里求学」这类分段标题时用它，视野会跟着收到这一段。
+   */
+  GuideMap.prototype.soloSection = function (sectionId, skipFit) {
+    var sec = this.model.bySection[sectionId];
+    // 空段（子组的元素全被跳过）独占会把整张图清空，直接忽略
+    if (!sec || !sec.groupIds.length) return this;
+    return this.setActiveGroups(sec.groupIds, skipFit);
+  };
+
+  /** 容器分组是否整段可见（子组全部 active）；空段返回 false */
+  GuideMap.prototype.isSectionActive = function (sectionId) {
+    var sec = this.model.bySection[sectionId];
+    if (!sec || !sec.groupIds.length) return false;
+    var self = this;
+    return sec.groupIds.every(function (id) {
+      return !!self.active[id];
+    });
+  };
+
+  GuideMap.prototype.getActiveGroups = function () {
+    var self = this;
+    return this.model.groups
+      .filter(function (g) {
+        return self.active[g.id];
+      })
+      .map(function (g) {
+        return g.id;
+      });
+  };
+
+  GuideMap.prototype.isAllGroupsActive = function () {
+    return this.getActiveGroups().length === this.model.groups.length;
+  };
+
+  GuideMap.prototype._afterFilter = function (skipFit) {
+    this.stop();
+    if (skipFit) this.render();
+    else this.resetView();
+    this.emit('filter', this.getActiveGroups(), this);
+    return this;
+  };
+
+  /* ---- 顺序巡游 -------------------------------------------------------- */
+
+  GuideMap.prototype.play = function () {
+    var self = this;
+    var t = this._tour;
+    var cfg = this.options.tour;
+    this.stop();
+    t.playing = true;
+    t.idx = 0;
+    this.emit('tour:start', this);
+
+    function step() {
+      if (!t.playing) return;
+      var points = self.model.points;
+      if (t.idx >= points.length) {
+        if (cfg.loop) t.idx = 0;
+        else {
+          self.stop();
+          self.resetView();
+          self.emit('tour:end', self);
+          return;
+        }
+      }
+      var p = points[t.idx];
+      var i = t.idx++;
+      if (!self.isActive(p.groupId)) {
+        t.timer = setTimeout(step, 30);
+        return;
+      }
+      self.select(p.id, { focus: cfg.autoFocus, silent: true });
+      self.emit('tour:step', p, i, self);
+      self.emit('select', p, self);
+      t.timer = setTimeout(step, cfg.interval);
+    }
+    step();
+    return this;
+  };
+
+  GuideMap.prototype.stop = function () {
+    var t = this._tour;
+    if (t.timer) {
+      clearTimeout(t.timer);
+      t.timer = null;
+    }
+    if (t.playing) {
+      t.playing = false;
+      this.emit('tour:stop', this);
+    }
+    return this;
+  };
+
+  GuideMap.prototype.isPlaying = function () {
+    return this._tour.playing;
+  };
+
+  GuideMap.prototype.toggleTour = function () {
+    return this._tour.playing ? this.stop() : this.play();
+  };
+
+  /* ---- 读取与杂项 ------------------------------------------------------ */
+
+  GuideMap.prototype.colorOf = function (groupId) {
+    if (this.colors[groupId]) return this.colors[groupId];
+    var p = this.options.theme.palette || [];
+    return normColor(p.length ? p[0] : DEFAULT_COLOR);
+  };
+
+  GuideMap.prototype.getPoint = function (id) {
+    return this.model.byPoint[id] || null;
+  };
+
+  GuideMap.prototype.getGroup = function (id) {
+    return this.model.byGroup[id] || null;
+  };
+
+  GuideMap.prototype.getSection = function (id) {
+    return this.model.bySection[id] || null;
+  };
+
+  GuideMap.prototype.getLink = function (id) {
+    for (var i = 0; i < this.model.links.length; i++) {
+      if (this.model.links[i].id === id) return this.model.links[i];
+    }
+    return null;
+  };
+
+  /** 某点出发的下一段连线 */
+  GuideMap.prototype.getOutboundLink = function (id) {
+    for (var i = 0; i < this.model.links.length; i++) {
+      if (this.model.links[i].fromId === id) return this.model.links[i];
+    }
+    return null;
+  };
+
+  GuideMap.prototype.getSummary = function () {
+    return summarize(this.model);
+  };
+
+  GuideMap.prototype.destroy = function () {
+    this.stop();
+    ['markerLayer', 'lineLayer', 'arcFallbackLayer', 'arcLayer', 'infoWindow'].forEach(function (k) {
+      var o = this[k];
+      if (o && isFn(o.destroy)) {
+        try {
+          o.destroy();
+        } catch (e) {
+          /* 图层已随地图销毁 */
+        }
+      }
+      this[k] = null;
+    }, this);
+    if (this.map && isFn(this.map.destroy)) this.map.destroy();
+    this.map = null;
+    this._events = {};
+    return this;
+  };
+
+  /* ========================================================================
+   * 8. 静态导出
+   * ====================================================================== */
+
+  GuideMap.parse = parse;
+  GuideMap.summarize = summarize;
+  GuideMap.decodeDeltaLatLng = decodeDeltaLatLng;
+  GuideMap.normEnum = normEnum;
+  GuideMap.PIN_SHAPES = PIN_SHAPES;
+  GuideMap.DEFAULTS = DEFAULTS;
+  GuideMap.SAFE_AREA = SAFE_AREA;
+  GuideMap.MODE_LABEL = MODE_LABEL;
+  GuideMap.TYPE_LABEL = TYPE_LABEL;
+  GuideMap.GROUP_TYPE_LABEL = GROUP_TYPE_LABEL;
+  GuideMap.utils = {
+    esc: esc,
+    merge: merge,
+    withAlpha: withAlpha,
+    normColor: normColor,
+    parseHSL: parseHSL,
+    sanitizePolylineStyle: sanitizePolylineStyle,
+    svgURI: svgURI,
+    fmtDistance: fmtDistance,
+    fmtDuration: fmtDuration,
+  };
+  GuideMap.version = '2.0.0';
+
+  return GuideMap;
+});
+
+</script>
+  </head>
+  <body>
+    <div class="gm-app">
+      <div class="gm-map" id="map"></div>
+
+      <!-- ==== UI 挂载区（结构）====
+         面板 / 图例 / 控制条写在这里，与 .gm-map 同级。
+         浮在地图上：绝对定位 + z-index: var(--ui-z)，并把占位传给 safePadding()。
+         与地图平级并排：先把 .gm-map 改回 static（默认 absolute 铺满容器），
+         再把 .gm-app 改成 flex，地图那格 flex:1 且 min-width/height:0。 -->
+
+      <aside class="pnl" id="pnl">
+        <div class="pnl-hd">
+          <div class="kick">9月25日 - 9月27日 · 扬州</div>
+          <h1 id="u-title">扬州3日自然山水游</h1>
+          <p class="pnl-sub" id="u-stats"></p>
+        </div>
+        <div class="pnl-bd" id="u-groups"></div>
+        <div class="pnl-ft" id="u-legend"></div>
+      </aside>
+
+
+      <div class="gm-tip" id="tip">正在渲染指南…</div>
+    </div>
+
+    <!--
+      指南数据内嵌于此。用 type="application/json" 而不是直接写成 JS 变量：
+      浏览器不会把它当脚本执行，即使数据里有可疑内容也只是解析失败，不会被执行。
+      生成时 < > & 已转义为 \u003c \u003e \u0026（JSON 合法转义，parse 后原样还原），
+      所以正文里不可能出现 </script> 把标签提前闭合。
+    -->
+    <script type="application/json" id="guide-data">
+      {"ok":true,"compatibility":"converted","guide":{"title":"扬州3日自然山水游","sub_title":"9月25日 - 9月27日","brief":"两人三日扬州漫游：首日穿行老城园林与市井长街，次日漫游瘦西湖湖山古寺，末日探访运河三湾的文博新地标。全程步行串联，共 7 站约 5.7 km。","city_info":["扬州"],"labels":[],"groups":[{"group_id":"s1","group_name":"Day1","group_type":"day","seq_no":1,"elements":[{"element_id":"e1","element_type":1,"seq_no":1,"role":1,"title":"生东1996·淮扬老字号(何园店)","intro":"开了三十年的淮扬老字号，就挨在何园隔壁的徐凝门大街上","location":{"lat":32.38453,"lng":119.450013},"highlights":["三十年老字号","蟹粉狮子头","招牌红烧肉"],"tips":"午市 10:30 开餐、周末延至 14:00，晚市 16:30 起；饭点常排队，建议开门就去或 13:00 后错峰。","attachment":{"route_to_next":{"distance":160,"duration":3,"mode":"walking","polyline":"32.38453,119.450013,-213,190,-240,210,-250,210,-260,220,-73,284","polyline_type":1}}},{"element_id":"e2","element_type":1,"seq_no":2,"role":1,"title":"何园","intro":"晚清第一名园，1500 米复道回廊串起中西合璧的宅园","location":{"lat":32.385644,"lng":119.448977},"highlights":["片石山房","复道回廊","玉绣楼"],"tips":"9 月 7:30-17:30 开放；建议东门进、南门出，游览约 1.5-2 小时，出园即上皮市街。","attachment":{"route_to_next":{"distance":1416,"duration":18,"mode":"walking","polyline":"32.385644,119.448977,-641,310,-5,284,-41,1281,-64,1129,36,550,70,1243,-27,374,-395,1663,-108,549,-99,488,-119,1817,-35,539,-70,1672,-4,112,-223,1,-354,-4,-396,102","polyline_type":1}}},{"element_id":"e3","element_type":1,"seq_no":3,"role":1,"title":"东关街","intro":"千年青石古街，青砖黛瓦间吃遍扬州小吃与淮扬细点","location":{"lat":32.397754,"lng":119.446502},"highlights":["东关古渡","扬州剪纸","小吃一条街"],"tips":"傍晚亮灯后最有味道；主街人多，拐进两侧小巷更清净，街东头便是东关古渡码头。"}]},{"group_id":"s2","group_name":"Day2","group_type":"day","seq_no":2,"elements":[{"element_id":"e4","element_type":1,"seq_no":4,"role":1,"title":"观音山禅院","intro":"蜀冈深处的清净禅院，黄墙蜿蜒树影深，少有游客","location":{"lat":32.42036,"lng":119.41684},"highlights":["免费领香","蜀冈揽胜","人少清净"],"tips":"7:00-11:30、13:30-15:30 开放，免门票；外香不可带入，参观预留约 1 小时。","attachment":{"route_to_next":{"distance":1799,"duration":22,"mode":"walking","polyline":"32.42036,119.41684,-1850,-764,-92,-760,110,-762,216,-1503,178,-1269,49,-391,53,-293,132,-913,253,-1767,77,-232,175,-260,-168,-192,61,-220,63,-898,-2,-62,144,-597,7,-108,202,-149,20,-18,13,-30,0,-228,35,-79,233,-264,52,-24,74,-10,274,1,48,-24,121,-137,91,-92,252,587,86,302,36,56,69,47,59,14,363,49,663,113,641,105,241,17,117,-15,4,25,112,419","polyline_type":1}}},{"element_id":"e5","element_type":1,"seq_no":5,"role":1,"title":"瘦西湖","intro":"两岸花柳全依水，一路楼台直到山","location":{"lat":32.410034,"lng":119.420052},"highlights":["五亭桥","二十四桥","白塔晴云"],"tips":"南门（虹桥坊）进入最顺；建议提前网购门票，全程游览约 3 小时，累了可乘船。","attachment":{"route_to_next":{"distance":2311,"duration":29,"mode":"walking","polyline":"32.410034,119.420052,-112,-419,-4,-25,-117,15,-241,-17,-641,-105,-663,-113,-363,-49,-59,-14,-69,-47,-36,-56,-86,-302,-252,-587,-91,92,-121,137,-48,24,-274,-1,-74,10,-52,24,-233,264,-35,79,0,228,-13,30,-20,18,-202,149,-7,108,-144,597,2,62,-63,898,-61,220,168,192,267,-100,2302,-75,1748,-42,413,7,513,-2,31,0,1099,-4,144,-10,639,-45,473,11,792,55,1722,122,352,129,263,160,214,195,473,890,103,541,604,1107,643,921,-223,305,-59,217,-1464,-297","polyline_type":1}}},{"element_id":"e6","element_type":1,"seq_no":6,"role":1,"title":"宋夹城体育休闲公园","intro":"宋代城池遗址上的免费公园，环湖跑道与草地日落","location":{"lat":32.415531,"lng":119.42719},"highlights":["宋夹城遗址","免费入园","环湖跑道"],"tips":"开放至 21:30（21:00 停止进入）；傍晚在湖边草地歇脚看日落最舒服。"}]},{"group_id":"s3","group_name":"Day3","group_type":"day","seq_no":3,"elements":[{"element_id":"e7","element_type":1,"seq_no":7,"role":1,"title":"中国大运河博物馆","intro":"卧在运河三湾湿地上的国家级博物馆，一馆看尽千年运河","location":{"lat":32.362339,"lng":119.428465},"highlights":["运河之舟","免费预约","三湾湿地"],"tips":"9:00-17:00（16:00 停止入馆）、周一闭馆；免费但需提前在官方公众号预约，周末名额紧张。"}]}]}}
+    </script>
+
+    <script>
+      /** 按分组数量生成等距色环。组件不会自动配色，分组多到手写色板不现实时用它。
+       *  内部已调 normColor()：JSAPI 不认 hsl()，直传会渲染成白色。 */
+      function ramp(n) {
+        var out = [];
+        for (var i = 0; i < n; i++) {
+          out.push(GuideMap.utils.normColor('hsl(' + Math.round((i * 360) / n) + ', 58%, 46%)'));
+        }
+        return out;
+      }
+
+      /** 两点球面距离（km）。组件不含几何计算，按距离筛飞线时需要。 */
+      function haversine(a, b) {
+        var R = 6371,
+          rad = Math.PI / 180;
+        var dLat = (b.lat - a.lat) * rad,
+          dLng = (b.lng - a.lng) * rad;
+        var h =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * R * Math.asin(Math.sqrt(h));
+      }
+
+      /**
+       * 视野留白。fitBounds 只认地图容器的矩形，不知道四角压着控件、也不知道你盖了面板，
+       * 不留够的话贴边的站点会被指南针 / 缩放 / 比例尺 / Logo 压住，看起来像「少了一个点」。
+       *
+       * 基线取自 GuideMap.SAFE_AREA（右上 100×200、左下 240×60）再加 16px 间距；
+       * 自己加了浮层就把它的占位传进来，例如左侧 280px 面板：safePadding({ left: 280 })
+       */
+      function safePadding(extra) {
+        var S = GuideMap.SAFE_AREA,
+          GAP = 16,
+          BASE = 72;
+        extra = extra || {};
+        return {
+          top: BASE + (extra.top || 0),
+          right: Math.max(BASE, S.topRight.width + GAP) + (extra.right || 0),
+          bottom: Math.max(BASE, S.bottomLeft.height + GAP) + (extra.bottom || 0),
+          left: BASE + (extra.left || 0),
+        };
+      }
+
+      function bootGuide() {
+        (function () {
+          var tip = document.getElementById('tip');
+          try {
+            var json = JSON.parse(document.getElementById('guide-data').textContent);
+
+            var opts = {
+              map: { zoom: 12, viewMode: '2D' },
+              // 三天三色：Day1 园林青 / Day2 湖山绿 / Day3 运河褐
+              theme: { palette: ['#2F7FA8', '#4F8A5B', '#B08050'] },
+              marker: { shape: 'pin', text: 'seq', label: 'title' },
+              route: { colorBy: 'group' },
+              arc: { enable: false }, // 同城漫游，不画跨天飞线
+              infoWindow: {
+                // 自定义信息卡：名称 / 简介 / 亮点标签 / 到达贴士 / 下一程
+                render: function (point, ctx) {
+                  var raw = point.raw || {};
+                  var tags = (raw.highlights || [])
+                    .map(function (t) {
+                      return '<span>' + ctx.esc(t) + '</span>';
+                    })
+                    .join('');
+                  var out = ctx.api.getOutboundLink(point.id);
+                  var foot = '';
+                  if (out) {
+                    foot =
+                      '<div class="gm-iw-foot">下一程 · ' +
+                      ctx.esc(GuideMap.MODE_LABEL[out.mode] || out.mode) +
+                      ' ' +
+                      ctx.esc(ctx.fmtDistance(out.distance)) +
+                      ' · 约 ' +
+                      ctx.esc(ctx.fmtDuration(out.duration, 'minute')) +
+                      '</div>';
+                  }
+                  return (
+                    '<div class="gm-iw">' +
+                    '<span class="gm-iw-badge" style="background:' +
+                    ctx.color +
+                    '">' +
+                    ctx.esc(point.groupName) +
+                    ' · 第 ' +
+                    (point.seq == null ? '·' : point.seq) +
+                    ' 站</span>' +
+                    '<p class="gm-iw-title">' +
+                    ctx.esc(point.title) +
+                    '</p>' +
+                    (point.intro ? '<p class="gm-iw-body">' + ctx.esc(point.intro) + '</p>' : '') +
+                    (tags ? '<div class="gm-iw-tags">' + tags + '</div>' : '') +
+                    (raw.tips ? '<div class="gm-iw-tip"><b>到达贴士</b>' + ctx.esc(raw.tips) + '</div>' : '') +
+                    foot +
+                    '</div>'
+                  );
+                },
+              },
+            };
+            opts.container = 'map';
+            opts.data = json;
+            // 避开地图控件；上面的配置里若显式写了 fitBounds，以它为准
+            opts.fitBounds = GuideMap.utils.merge({ padding: safePadding() }, opts.fitBounds);
+
+            var gm = new GuideMap(opts);
+            tip.remove();
+            window.gm = gm; // 控制台可直接调 API：gm.getSummary() / gm.play() / gm.soloGroup('s2')
+
+            /* ==== UI 挂载区（逻辑）====
+               在这里构建面板并订阅组件事件。原则见 references/map-components.md：
+                 1. 组件是状态的唯一来源，UI 只在事件回调里跟着刷新
+                 2. 浮层压着地图时把占位传给 safePadding()，例如
+                    gm.options.fitBounds.padding = safePadding({ left: 296 }); gm.resetView(true); */
+
+            var esc = GuideMap.utils.esc;
+            var fmtDistance = GuideMap.utils.fmtDistance;
+            var fmtDuration = GuideMap.utils.fmtDuration;
+            var DATE_LABEL = { Day1: '9月25日', Day2: '9月26日', Day3: '9月27日' };
+
+            var s = gm.getSummary();
+            document.getElementById('u-stats').textContent =
+              s.levels.map(function (l) { return l.count + ' 个' + l.typeLabel; }).join(' · ') +
+              ' · ' + s.pointCount + ' 站 · ' + s.totalDistanceText;
+            document.getElementById('u-stats').title = '总距离按各日程内步行路线累计计算';
+
+            /** 站间「下一程」提示：出行方式 + 距离 + 耗时 */
+            function legRow(link) {
+              var label = GuideMap.MODE_LABEL[link.mode] || link.mode || '步行';
+              return (
+                '<li class="leg">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
+                '<circle cx="5" cy="19" r="2" fill="currentColor" stroke="none"/>' +
+                '<circle cx="19" cy="5" r="2" fill="currentColor" stroke="none"/>' +
+                '<path d="M7 17 L17 7" stroke-dasharray="3 3"/></svg>' +
+                '<b>' + esc(label) + '</b>' +
+                ' ' + esc(fmtDistance(link.distance)) + ' · 约 ' + esc(fmtDuration(link.duration, 'minute')) +
+                '</li>'
+              );
+            }
+
+            function stopsHtml(g) {
+              return (
+                '<ol class="stops">' +
+                g.pointIds
+                  .map(function (id, i) {
+                    var p = gm.getPoint(id);
+                    var html =
+                      '<li class="stop" data-id="' + esc(p.id) + '">' +
+                      '<span class="sq" style="background:' + gm.colorOf(g.id) + '">' +
+                      (p.seq == null ? '·' : p.seq) +
+                      '</span>' +
+                      '<div><b>' + esc(p.title) + '</b>' +
+                      (p.intro ? '<span class="intro">' + esc(p.intro) + '</span>' : '') +
+                      '</div></li>';
+                    var next = g.pointIds[i + 1];
+                    if (next) {
+                      for (var k = 0; k < gm.model.links.length; k++) {
+                        var l = gm.model.links[k];
+                        if (l.fromId === id && l.toId === next) { html += legRow(l); break; }
+                      }
+                    }
+                    return html;
+                  })
+                  .join('') +
+                '</ol>'
+              );
+            }
+
+            document.getElementById('u-groups').innerHTML = gm.model.groups
+              .map(function (g) {
+                return (
+                  '<section class="day" data-id="' + esc(g.id) + '">' +
+                  '<button type="button" class="g" data-id="' + esc(g.id) + '">' +
+                  '<i style="background:' + gm.colorOf(g.id) + '"></i>' + esc(g.name) +
+                  '<em>' + (DATE_LABEL[g.name] || '') + ' · ' + g.pointIds.length + ' 站</em>' +
+                  '</button>' + stopsHtml(g) +
+                  '</section>'
+                );
+              })
+              .join('');
+
+            /** 每日图例：按天配色 */
+            function legend() {
+              document.getElementById('u-legend').innerHTML =
+                gm.model.groups
+                  .map(function (g) {
+                    return (
+                      '<span class="lg lg-dot"><i style="background:' + gm.colorOf(g.id) + '"></i>' +
+                      esc(g.name) + ' ' + esc(DATE_LABEL[g.name] || '') +
+                      '</span>'
+                    );
+                  })
+                  .join('') +
+                '<span class="legend-note">连线为当日步行路线，按序游览不走回头路</span>';
+            }
+
+            /** 状态全部从组件读，不维护平行副本 */
+            function sync() {
+              document.querySelectorAll('.g').forEach(function (el) {
+                el.classList.toggle('off', !gm.isActive(el.dataset.id));
+              });
+              document.querySelectorAll('.stop').forEach(function (el) {
+                el.classList.toggle('on', gm.currentId === el.dataset.id);
+              });
+            }
+
+            var box = document.getElementById('u-groups');
+            box.addEventListener('click', function (ev) {
+              var stop = ev.target.closest('.stop');
+              if (stop) { gm.select(stop.dataset.id, { focus: true, openInfo: true }); return; }
+              var b = ev.target.closest('.g');
+              if (!b) return;
+              if (gm.isActive(b.dataset.id) && gm.getActiveGroups().length === 1) gm.showAllGroups();
+              else gm.soloGroup(b.dataset.id);
+            });
+
+            gm.on('filter', sync);
+            gm.on('select', sync);
+
+            legend();
+            sync();
+
+            // 左侧面板占位交给 fitBounds，贴边的站点不会被压住
+            var pw = Math.ceil(document.getElementById('pnl').getBoundingClientRect().width) + 24;
+            gm.options.fitBounds.padding = safePadding({ left: pw });
+            gm.resetView(true);
+            sync();
+          } catch (e) {
+            tip.className = 'gm-tip is-error';
+            tip.textContent = '渲染失败：' + e.message;
+            throw e; // 保留堆栈，方便在控制台定位
+          }
+        })();
+      }
+
+
+      // TMap 未就绪时动态注入 SDK（URL 带 key，替换 __TENCENT_MAP_KEY__ 为真实 key）
+      if (typeof TMap !== 'undefined') { bootGuide(); }
+      else {
+        var sdkEl = document.createElement('script');
+        sdkEl.setAttribute('src', 'https://map.qq.com/api/gljs?v=1.exp&key=__TENCENT_MAP_KEY__&libraries=visualization');
+        sdkEl.onload = bootGuide;
+        sdkEl.onerror = function () {
+          var tip = document.getElementById('tip');
+          tip.className = 'gm-tip is-error';
+          tip.textContent = '地图 SDK 加载失败，请检查网络后刷新重试';
+        };
+        document.head.appendChild(sdkEl);
+      }
+    </script>
+  </body>
+</html>
