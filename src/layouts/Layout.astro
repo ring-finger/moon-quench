@@ -5,15 +5,22 @@ interface Props {
   title: string;
   description?: string;
   active?: string;
+  /** 布局模式：home 首页（无导航栏） | page 功能页（有导航但无返回首页入口） */
+  mode?: 'home' | 'page';
 }
-const { title, description = '饮月听风 · 个人作品集', active = '' } = Astro.props;
+const {
+  title,
+  description = '饮月听风 · 个人作品集',
+  active = '',
+  mode = 'page',
+} = Astro.props;
 
 const base = import.meta.env.BASE_URL;
+// 功能页导航：不含「首页」，也不提供返回首页的入口
 const navItems = [
-  { href: `${base}`, label: '首页', key: '' },
-  { href: `${base}blog`, label: '博客', key: 'blog' },
-  { href: `${base}travel`, label: '旅游路线', key: 'travel' },
-  { href: `${base}radio`, label: '业余无线电', key: 'radio' },
+  { href: `${base}blog`, label: '灵犀小筑', key: 'blog' },
+  { href: `${base}travel`, label: '旅游小记', key: 'travel' },
+  { href: `${base}radio`, label: '无线电波', key: 'radio' },
 ];
 ---
 
@@ -28,31 +35,45 @@ const navItems = [
     <title>{title}</title>
   </head>
   <body>
-    <nav class="site-nav">
-      <div class="nav-inner">
-        <a href={`${base}`} class="brand">
-          <span class="logo">月</span>
-          <span>饮月听风</span>
-        </a>
-        <div class="nav-links">
-          {
-            navItems.map((item) => (
-              <a
-                href={item.href}
-                class={active === item.key ? 'active' : ''}
-              >
-                {item.label}
-              </a>
-            ))
-          }
-        </div>
-      </div>
-    </nav>
+    {
+      mode === 'page' && (
+        <nav class="site-nav">
+          <div class="nav-inner">
+            <!-- 品牌标识不链接，不提供返回首页入口 -->
+            <span class="brand brand-static">
+              <span class="logo logo-svg">
+                <svg viewBox="0 0 128 128" width="28" height="28" aria-hidden="true">
+                  <rect width="128" height="128" rx="28" fill="#1E2A4A"></rect>
+                  <g fill="#FFFFFF" text-anchor="middle" font-family="'LXGW WenKai','霞鹜文楷','Kaiti SC','KaiTi','STKaiti','楷体',serif">
+                    <text x="64" y="62" font-size="46">月</text>
+                    <text x="64" y="110" font-size="46">风</text>
+                  </g>
+                </svg>
+              </span>
+              <span>月风</span>
+            </span>
+            <div class="nav-links">
+              {
+                navItems.map((item) => (
+                  <a href={item.href} class={active === item.key ? 'active' : ''}>
+                    {item.label}
+                  </a>
+                ))
+              }
+            </div>
+          </div>
+        </nav>
+      )
+    }
 
     <slot />
 
-    <footer class="site-footer">
-      饮月听风 · 记录作品、旅途与电波
-    </footer>
+    {
+      mode === 'page' && (
+        <footer class="site-footer">
+          月风 · 记录作品、旅途与电波
+        </footer>
+      )
+    }
   </body>
 </html>

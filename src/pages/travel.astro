@@ -44,9 +44,9 @@ const days = [
 ];
 ---
 
-<Layout title={`${title} · 饮月听风`} active="travel">
+<Layout title={`${title} · 月风`} active="travel">
   <main class="container page">
-    <span class="badge badge-brand">旅游路线</span>
+    <span class="badge badge-brand">旅游小记</span>
     <h1 class="page-title">{title}</h1>
     <p class="page-sub">{subtitle}</p>
     <p class="page-brief">{brief}</p>
@@ -102,13 +102,11 @@ const days = [
 
   .page-title {
     font-size: 40px;
-    font-weight: 800;
-    letter-spacing: 2px;
+    font-weight: 700;
+    letter-spacing: 3px;
     margin: 16px 0 6px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    font-family: var(--font-kai);
+    color: var(--navy);
   }
 
   .page-sub {
@@ -208,7 +206,7 @@ const days = [
     height: 12px;
     border-radius: 50%;
     margin-top: 6px;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    box-shadow: 0 0 0 3px rgba(30, 42, 74, 0.12);
   }
 
   .day-name {

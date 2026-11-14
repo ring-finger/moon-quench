@@ -2,10 +2,10 @@
 import Layout from '../layouts/Layout.astro';
 ---
 
-<Layout title="业余无线电 · 饮月听风" active="radio">
+<Layout title="无线电波 · 月风" active="radio">
   <main class="container page">
-    <span class="badge badge-brand">业余无线电</span>
-    <h1 class="page-title">业余无线电</h1>
+    <span class="badge badge-brand">无线电波</span>
+    <h1 class="page-title">无线电波</h1>
     <p class="page-desc">呼号、证件与业余无线电台分区地图</p>
 
     <div class="map-wrap">
@@ -30,13 +30,11 @@ import Layout from '../layouts/Layout.astro';
 
   .page-title {
     font-size: 40px;
-    font-weight: 800;
-    letter-spacing: 2px;
+    font-weight: 700;
+    letter-spacing: 3px;
     margin: 16px 0 8px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    font-family: var(--font-kai);
+    color: var(--navy);
   }
 
   .page-desc {
