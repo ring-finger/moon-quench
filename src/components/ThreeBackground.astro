@@ -456,14 +456,15 @@
   });
 
   // ================= 落叶（地面竹林的质感） =================
+  // 用暗绿褐/深棕的枯竹叶，避免亮黄（夜里像纸片，观感不吉利）
   const litterMats = [
-    new THREE.MeshStandardMaterial({ color: 0x655329, roughness: 0.95, side: THREE.DoubleSide }),
-    new THREE.MeshStandardMaterial({ color: 0x4c3f22, roughness: 0.96, side: THREE.DoubleSide }),
-    new THREE.MeshStandardMaterial({ color: 0x3a442c, roughness: 0.96, side: THREE.DoubleSide }),
-    new THREE.MeshStandardMaterial({ color: 0x776133, roughness: 0.94, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0x3d4a30, roughness: 0.96, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0x2f3b28, roughness: 0.96, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0x47543a, roughness: 0.95, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0x3a3325, roughness: 0.96, side: THREE.DoubleSide }),
   ];
   const litterGeos = [[], [], [], []];
-  const LITTER_COUNT = 900;
+  const LITTER_COUNT = 720;
 
   for (let i = 0; i < LITTER_COUNT; i++) {
     // 靠竹林密、路与桌周围也有零星吹落的
@@ -473,8 +474,8 @@
       : (rng() - 0.5) * 56;
     const z = nearTable ? -2 + rng() * 12 : -36 + rng() * 50;
 
-    const w = 0.08 + rng() * 0.1;
-    const h = 0.18 + rng() * 0.22;
+    const w = 0.06 + rng() * 0.08;
+    const h = 0.12 + rng() * 0.16;
     const g = new THREE.PlaneGeometry(w, h);
     g.rotateX(-Math.PI / 2);
     g.rotateY(rng() * Math.PI * 2);
@@ -1029,24 +1030,107 @@
   // 鼠标视差
   let targetX = camera.position.x;
   let targetY = camera.position.y;
+
+  // 鼠标「风」：滑动越快，带起的风越强；随鼠标移动方向吹向竹林，并随时间衰减
+  // 风是「局部」的——只影响鼠标附近的竹子，远处不受影响
+  const mouseWind = { x: 0, z: 0 };
+  // 鼠标在世界空间（地面平面 y=0）上的位置，用于按距离衰减
+  const mouseWorld = { x: 0, z: 0, active: false };
+  const raycaster = new THREE.Raycaster();
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const mouseNdc = new THREE.Vector2();
+
+  let lastMX = 0;
+  let lastMY = 0;
+  let lastMTime = 0;
+  let hasLastM = false;
+
   window.addEventListener('mousemove', (e) => {
     const nx = e.clientX / window.innerWidth - 0.5;
     const ny = e.clientY / window.innerHeight - 0.5;
     targetX = CAM_BASE_X + nx * 1.4;
     targetY = CAM_BASE_Y - ny * 0.5;
+
+    // 把鼠标屏幕坐标反投影到地面平面，得到世界坐标（用于局部风的空间衰减）
+    mouseNdc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+    raycaster.setFromCamera(mouseNdc, camera);
+    const hit = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(groundPlane, hit)) {
+      mouseWorld.x = hit.x;
+      mouseWorld.z = hit.z;
+      mouseWorld.active = true;
+    } else {
+      mouseWorld.active = false;
+    }
+
+    // 计算瞬时速度（px/ms），换算成风量并累加
+    const now = performance.now();
+    if (hasLastM) {
+      const dt = Math.max(1, now - lastMTime);
+      const dx = e.clientX - lastMX;
+      const dy = e.clientY - lastMY;
+      // 横向速度主导风向，纵向作为辅助；速度上限裁剪，避免瞬时抖动
+      const vx = Math.max(-8, Math.min(8, dx / dt));
+      const vy = Math.max(-8, Math.min(8, dy / dt));
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      if (speed > 0.4) {
+        // 归一化方向 × 速度驱动的强度，累积到 mouseWind（力度克制，避免整片倒伏）
+        const strength = Math.min(1.4, speed * 0.06);
+        mouseWind.x += (vx / speed) * strength;
+        mouseWind.z += (vy / speed) * strength * 0.5;
+        // 再给一个小上限，防止长时间滑动堆积过头
+        const m = Math.hypot(mouseWind.x, mouseWind.z);
+        if (m > 1.6) {
+          mouseWind.x *= 1.6 / m;
+          mouseWind.z *= 1.6 / m;
+        }
+      }
+    }
+    lastMX = e.clientX;
+    lastMY = e.clientY;
+    lastMTime = now;
+    hasLastM = true;
   });
 
   function animate() {
     t += 0.016;
 
-    // 竹林：同一风场驱动，形成整片掠过的一阵阵风
+    // 鼠标风随时间指数衰减，风掠过竹林后逐渐平息
+    const decay = Math.exp(-0.04);
+    mouseWind.x *= decay;
+    mouseWind.z *= decay;
+    if (Math.hypot(mouseWind.x, mouseWind.z) < 0.003) {
+      mouseWind.x = 0;
+      mouseWind.z = 0;
+    }
+
+    // 竹林：同一风场驱动，形成整片掠过的一阵阵风；鼠标快速划过时再叠加一阵「手风」
+    // 鼠标风是局部的：离鼠标越远的竹子受影响越小，远处几乎不动
+    const WIND_RADIUS = 7.5; // 影响半径（世界单位），据此做高斯衰减
     bambooNodes.forEach((b) => {
       const w = windAt(t, b.x, b.z);
       const sway = w * b.amp;
+
+      // 距离衰减：近处强、远处趋零
+      let spatial = 0;
+      if (mouseWorld.active) {
+        const dx = b.x - mouseWorld.x;
+        const dz = b.z - mouseWorld.z;
+        const d2 = dx * dx + dz * dz;
+        spatial = Math.exp(-d2 / (WIND_RADIUS * WIND_RADIUS));
+      }
+
+      // 鼠标风：力度克制；按竹子位置给相位差，让风像波一样依次掠过，而非齐刷刷倒伏
+      const lag = (b.x * 0.12 + b.z * 0.05);
+      const mEnv = Math.sin(t * 1.1 - lag + b.seed);
+      // 个体差异：每根竹子对风的响应略有不同，打破整齐划一
+      const mInd = 0.75 + 0.25 * Math.sin(b.seed * 3.7);
+      const mx = mouseWind.x * b.amp * 0.3 * mEnv * mInd * spatial;
+      const mz = mouseWind.z * b.amp * 0.18 * mEnv * mInd * spatial;
       // 高频小颤保持生命力，但不破坏整体一致方向
       const flutter = Math.sin(t * 2.4 + b.seed) * 0.14;
-      b.group.rotation.z = -(sway * WIND_DIR_X) * (1 + flutter);
-      b.group.rotation.x = sway * WIND_DIR_Z * 0.6 * (1 + flutter);
+      b.group.rotation.z = -(sway * WIND_DIR_X) * (1 + flutter) - mx;
+      b.group.rotation.x = sway * WIND_DIR_Z * 0.6 * (1 + flutter) + mz;
     });
 
     // 茶汽：缓慢升起、轻微摇曳、极淡
