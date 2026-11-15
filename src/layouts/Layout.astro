@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import BrandMark from '../components/BrandMark.astro';
 
 interface Props {
   title: string;
@@ -42,15 +43,9 @@ const navItems = [
             <!-- 品牌标识不链接，不提供返回首页入口 -->
             <span class="brand brand-static">
               <span class="logo logo-svg">
-                <svg viewBox="0 0 128 128" width="28" height="28" aria-hidden="true">
-                  <rect width="128" height="128" rx="28" fill="#1E2A4A"></rect>
-                  <g fill="#FFFFFF" text-anchor="middle" font-family="'LXGW WenKai','霞鹜文楷','Kaiti SC','KaiTi','STKaiti','楷体',serif">
-                    <text x="64" y="62" font-size="46">月</text>
-                    <text x="64" y="110" font-size="46">风</text>
-                  </g>
-                </svg>
+                <BrandMark size={32} />
               </span>
-              <span>月风</span>
+              <span>饮月听风</span>
             </span>
             <div class="nav-links">
               {
@@ -71,7 +66,7 @@ const navItems = [
     {
       mode === 'page' && (
         <footer class="site-footer">
-          月风 · 记录作品、旅途与电波
+          饮月听风 · 记录作品、旅途与电波
         </footer>
       )
     }

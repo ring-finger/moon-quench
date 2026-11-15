@@ -45,6 +45,8 @@ npm run preview    # 本地预览构建产物
 
 部署到 GitHub Pages（构建产物 `dist/` 即为静态站点）。
 
+> 完整的启动与 Git 提交操作步骤见 [TUTORIAL.md](./TUTORIAL.md)。
+
 ## 后续待办
 
 - [ ] 导入旅游路线真实内容（替换 `travel.astro` 中的示例数据）

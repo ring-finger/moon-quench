@@ -1,258 +1,745 @@
 ---
 import Layout from '../layouts/Layout.astro';
 
-const title = '扬州3日自然山水游';
-const subtitle = '9月25日 - 9月27日';
-const brief =
-  '两人三日扬州漫游：首日穿行老城园林与市井长街，次日漫游瘦西湖湖山古寺，末日探访运河三湾的文博新地标。全程步行串联，共 7 站约 5.7 km。';
+const base = import.meta.env.BASE_URL;
 
-// 地图页路径（位于 public/yangzhou-map.html，用 BASE_URL 适配 GitHub Pages 子路径）
-const mapSrc = `${import.meta.env.BASE_URL}yangzhou-map.html`;
+// 卡片内最多展示的景点数，超出用「等 N 处」收口
+const MAX_SPOTS = 4;
 
-const days = [
+/* ============================================================
+   一次旅行 = 一条记录 = 一张卡片。
+   新增旅程时，往这个数组里加一个对象即可，其余全自动。
+   排序：按数组顺序自上而下渲染（最新的放最前面）。
+   ------------------------------------------------------------
+   字段说明
+   year / ganzhi / zodiac / place : 卡片右上角的地点行
+   dateStart / dateEnd            : 公历时间范围（YYYY.MM.DD）
+   lunarStart / lunarEnd          : 对应的农历
+   title                          : 标题
+   summary                        : 内容概括
+   days[]                         : 逐日索引（date 月日 + title 当天主题）
+   spots[]                        : 游览景点
+   photo                          : 主图（相对 public 的路径，留空则不渲染）
+   map                            : 行程地图（相对 public 的路径，留空则不渲染入口）
+   ============================================================ */
+const trips = [
   {
-    day: 'Day 1',
-    date: '9月25日',
-    theme: '老城园林 · 市井长街',
-    color: '#2F7FA8',
-    stops: [
-      { title: '生东1996·淮扬老字号(何园店)', intro: '开了三十年的淮扬老字号，挨在何园隔壁的徐凝门大街上' },
-      { title: '何园', intro: '晚清第一名园，1500 米复道回廊串起中西合璧的宅园' },
-      { title: '东关街', intro: '千年青石古街，青砖黛瓦间吃遍扬州小吃与淮扬细点' },
+    year: '2026',
+    ganzhi: '丙午年',
+    zodiac: '马',
+    place: '扬州 · 江苏',
+    title: '扬州 3 日自然山水游',
+    dateStart: '2026.09.25',
+    dateEnd: '2026.09.27',
+    lunarStart: '八月十五',
+    lunarEnd: '八月十七',
+    summary:
+      '两人三日扬州漫游：首日穿行老城园林与市井长街，恰好赶上中秋，抬头就是一轮满月；次日漫游瘦西湖湖山古寺；末日探访运河三湾的文博新地标。全程步行串联，共 7 站约 5.7 km。',
+    days: [
+      { date: '09.25', note: '中秋', title: '老城园林 · 市井长街' },
+      { date: '09.26', note: '', title: '瘦西湖 · 湖山古寺' },
+      { date: '09.27', note: '', title: '运河三湾 · 文博新地标' },
     ],
-  },
-  {
-    day: 'Day 2',
-    date: '9月26日',
-    theme: '瘦西湖 · 湖山古寺',
-    color: '#2E9E6B',
-    stops: [
-      { title: '观音山禅院', intro: '蜀冈深处的清净禅院，黄墙蜿蜒树影深，少有游客' },
-      { title: '瘦西湖', intro: '两岸花柳全依水，一路楼台直到山' },
-      { title: '宋夹城体育休闲公园', intro: '宋代城池遗址上的免费公园，环湖跑道与草地日落' },
+    spots: [
+      '生东1996·淮扬老字号',
+      '何园',
+      '东关街',
+      '观音山禅院',
+      '瘦西湖',
+      '宋夹城体育休闲公园',
+      '中国大运河博物馆',
     ],
-  },
-  {
-    day: 'Day 3',
-    date: '9月27日',
-    theme: '运河三湾 · 文博新地标',
-    color: '#B08050',
-    stops: [
-      { title: '中国大运河博物馆', intro: '卧在运河三湾湿地上的国家级博物馆，一馆看尽千年运河' },
-    ],
+    photo: '',
+    map: 'yangzhou-map.html',
   },
 ];
 ---
 
-<Layout title={`${title} · 月风`} active="travel">
-  <main class="container page">
-    <span class="badge badge-brand">旅游小记</span>
-    <h1 class="page-title">{title}</h1>
-    <p class="page-sub">{subtitle}</p>
-    <p class="page-brief">{brief}</p>
+<Layout title="旅游小记 · 饮月听风" active="travel">
+  <main class="journey">
+    <header class="j-hero">
+      <span class="badge badge-brand">旅游小记</span>
+      <h1 class="j-title">旅途时间轴</h1>
+      <p class="j-sub">走过的山水、住过的地方、吃完还想再吃的那一顿</p>
+    </header>
 
-    <!-- 地图主体：内嵌完整的地图行程指南 -->
-    <div class="map-shell">
-      <iframe
-        class="map-frame"
-        src={mapSrc}
-        title="扬州3日自然山水游 · 地图行程指南"
-        loading="lazy"
-      ></iframe>
-      <div class="map-toolbar">
-        <span class="map-hint">地图交互 · 点击站点查看详情与步行路线</span>
-        <a class="map-open" href={mapSrc} target="_blank" rel="noopener">
-          新窗口打开 ↗
-        </a>
+    <div class="list">
+      <div class="list-head">
+        <span class="lh-text">旅程记录</span>
+        <span class="lh-count">{trips.length} 段</span>
       </div>
-    </div>
 
-    <!-- 行程概览（补充） -->
-    <div class="overview">
-      <h2 class="overview-title">行程概览</h2>
-      <div class="day-grid">
-        {days.map((d) => (
-          <section class="day-card">
-            <div class="day-head">
-              <span class="day-dot" style={`background:${d.color}`}></span>
-              <div>
-                <h3 class="day-name">{d.day}</h3>
-                <span class="day-date">{d.date} · {d.theme}</span>
-              </div>
-            </div>
-            <ol class="stop-list">
-              {d.stops.map((s) => (
-                <li class="stop-item">
-                  <span class="stop-title">{s.title}</span>
-                  <span class="stop-intro">{s.intro}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ))}
-      </div>
+      <ol class="timeline">
+        {
+          trips.map((t, i) => (
+            <li class="tl-item reveal">
+              <span class="tl-node" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+
+              <article class="card">
+                {/* 时间范围（公历 + 农历）与地点 */}
+                <header class="card-head">
+                  <div class="card-when">
+                    <p class="range-date">
+                      {t.dateStart}
+                      <span class="rd-dash" aria-hidden="true">
+                        —
+                      </span>
+                      {t.dateEnd}
+                    </p>
+                    <p class="range-lunar">
+                      农历 {t.lunarStart}
+                      <span class="rd-dash" aria-hidden="true">
+                        —
+                      </span>
+                      {t.lunarEnd}
+                    </p>
+                  </div>
+
+                  <p class="card-where">
+                    {t.ganzhi} · {t.zodiac}
+                    <span class="cw-place">{t.place}</span>
+                  </p>
+                </header>
+
+                <h2 class="card-title">{t.title}</h2>
+
+                {t.photo && (
+                  <figure class="card-photo">
+                    <img src={`${base}${t.photo}`} alt={t.title} loading="lazy" />
+                  </figure>
+                )}
+
+                <p class="card-text">{t.summary}</p>
+
+                {/* 逐日索引：只留日期与当天主题，正文收在概括里 */}
+                <ul class="days">
+                  {t.days.map((d) => (
+                    <li>
+                      <span class="d-date">{d.date}</span>
+                      <span class="d-name">{d.title}</span>
+                      {d.note && <span class="d-note">{d.note}</span>}
+                    </li>
+                  ))}
+                </ul>
+
+                <footer class="card-foot">
+                  <div class="spots">
+                    <span class="spots-label">
+                      途经 <b>{t.spots.length}</b> 处
+                    </span>
+                    {t.spots.slice(0, MAX_SPOTS).map((s) => (
+                      <span class="chip">{s}</span>
+                    ))}
+                  </div>
+
+                  {t.map && (
+                    <a
+                      class="map-link"
+                      href={`${base}${t.map}`}
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z" />
+                        <path d="M9 7v13M15 4v13" />
+                      </svg>
+                      <span>行程地图</span>
+                    </a>
+                  )}
+                </footer>
+              </article>
+            </li>
+          ))
+        }
+
+        <li class="tl-end">
+          <span class="end-dot" aria-hidden="true"></span>
+          <p>下一段旅程 · 待续</p>
+        </li>
+      </ol>
     </div>
   </main>
 </Layout>
 
 <style>
-  .page {
-    padding: 80px 24px 120px;
+  /* ================================================================
+     布局基准：一条内容栏，全页共用同一个左边缘
+     ================================================================ */
+  .journey {
+    --col: 980px;
+    --pad: 24px;
+    padding: 72px 0 96px;
+    overflow-x: hidden;
   }
 
-  .page-title {
-    font-size: 40px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    margin: 16px 0 6px;
+  /* ---------- 页头（通用，不涉及任何一次具体行程） ---------- */
+  .j-hero {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 14px var(--pad) 0;
+    text-align: center;
+  }
+
+  .j-title {
     font-family: var(--font-kai);
+    font-size: 38px;
+    font-weight: 600;
+    letter-spacing: 10px;
+    padding-left: 10px;
+    color: var(--navy);
+    margin: 18px 0 10px;
+  }
+
+  .j-sub {
+    font-size: 14px;
+    color: var(--text-faint);
+    font-family: var(--font-kai);
+    letter-spacing: 1px;
+  }
+
+  /* ---------- 列表 ---------- */
+  .list {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+  }
+
+  .list-head {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin: 52px 0 34px;
+    padding-left: 2px;
+  }
+
+  .list-head::before {
+    content: '';
+    flex: 0 0 24px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .lh-text {
+    font-family: var(--font-kai);
+    font-size: 13px;
+    letter-spacing: 5px;
+    padding-left: 5px;
     color: var(--navy);
   }
 
-  .page-sub {
-    font-size: 15px;
+  .lh-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1px;
     color: var(--text-faint);
-    margin-bottom: 8px;
-  }
-
-  .page-brief {
-    font-size: 15px;
-    color: var(--text-soft);
-    max-width: 680px;
-    line-height: 1.8;
-    margin-bottom: 40px;
-  }
-
-  /* 地图主体 */
-  .map-shell {
-    position: relative;
+    padding: 2px 9px;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
+    border-radius: 999px;
+  }
+
+  /* ================================================================
+     时间轴：单侧左轴，一次行程一个节点 + 一张卡片
+     ================================================================ */
+  .timeline {
+    position: relative;
+    list-style: none;
+  }
+
+  /* 轴线 */
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 13px;
+    top: 10px;
+    bottom: 10px;
+    width: 1px;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      var(--border) 26px,
+      var(--border) calc(100% - 40px),
+      transparent 100%
+    );
+  }
+
+  .tl-item {
+    position: relative;
+    padding-left: 62px;
+    padding-bottom: 34px;
+  }
+
+  .tl-item:last-of-type {
+    padding-bottom: 0;
+  }
+
+  /* 序号节点 */
+  .tl-node {
+    position: absolute;
+    left: 0;
+    top: 24px;
+    z-index: 2;
+    width: 27px;
+    height: 27px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid rgba(30, 42, 74, 0.16);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--navy-2);
+    transition: border-color 0.3s, color 0.3s, background 0.3s, box-shadow 0.3s;
+  }
+
+  /* 节点到卡片的引线 */
+  .tl-item::before {
+    content: '';
+    position: absolute;
+    left: 29px;
+    top: 37.5px;
+    width: 26px;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  .tl-item:hover .tl-node {
+    border-color: var(--gold);
+    background: #fff;
+    color: var(--navy);
+    box-shadow: 0 0 0 4px rgba(217, 185, 106, 0.14);
+  }
+
+  /* ---------- 卡片 ---------- */
+  .card {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    border-radius: 16px;
+    padding: 26px 28px 22px;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.4s, border-color 0.4s;
+  }
+
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(217, 185, 106, 0.5);
     box-shadow: var(--shadow-md);
-    background: var(--bg-card);
   }
 
-  .map-frame {
-    display: block;
-    width: 100%;
-    height: 640px;
-    border: none;
-  }
-
-  .map-toolbar {
+  /* 头部：左时间范围，右地点 */
+  .card-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
-    padding: 14px 18px;
-    background: var(--bg-card);
-    border-top: 1px solid var(--border-soft);
+    gap: 12px 24px;
+    flex-wrap: wrap;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-soft);
   }
 
-  .map-hint {
-    font-size: 13px;
-    color: var(--text-soft);
+  .card-when {
+    min-width: 0;
   }
 
-  .map-open {
-    font-size: 13px;
+  .range-date {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 15px;
     font-weight: 600;
-    color: var(--brand);
-    text-decoration: none;
+    letter-spacing: 0.6px;
+    line-height: 1.2;
+    color: var(--navy);
+  }
+
+  .rd-dash {
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+
+  .range-lunar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 7px;
+    font-family: var(--font-kai);
+    font-size: 12.5px;
+    letter-spacing: 0.5px;
+    color: var(--gold);
+  }
+
+  .card-where {
+    flex-shrink: 0;
+    text-align: right;
+    font-family: var(--font-kai);
+    font-size: 11.5px;
+    letter-spacing: 1.5px;
+    line-height: 1.8;
+    color: var(--text-faint);
+  }
+
+  .cw-place {
+    color: var(--text-soft);
+    letter-spacing: 1px;
     white-space: nowrap;
   }
 
-  .map-open:hover {
-    text-decoration: underline;
+  .cw-place::before {
+    content: '·';
+    margin: 0 6px;
+    color: var(--border);
   }
 
-  /* 行程概览 */
-  .overview {
-    margin-top: 64px;
+  .card-title {
+    font-family: var(--font-kai);
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    line-height: 1.4;
+    color: var(--navy);
+    margin: 17px 0 0;
   }
 
-  .overview-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: var(--text);
-    margin-bottom: 24px;
+  .card-photo {
+    margin: 16px 0 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--border-soft);
   }
 
-  .day-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
+  .card-photo img {
+    width: 100%;
+    height: auto;
+    display: block;
   }
 
-  .day-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 22px;
-    box-shadow: var(--shadow-sm);
+  .card-text {
+    max-width: 50em;
+    overflow-wrap: break-word;
+    margin-top: 12px;
+    font-size: 14.5px;
+    line-height: 1.95;
+    color: var(--text-soft);
   }
 
-  .day-head {
+  /* 逐日索引 */
+  .days {
+    list-style: none;
+    margin-top: 18px;
+    padding-left: 15px;
+    border-left: 1px solid var(--border-soft);
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
+    flex-direction: column;
+    gap: 8px;
   }
 
-  .day-dot {
+  .days li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-soft);
+  }
+
+  .d-date {
     flex-shrink: 0;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-top: 6px;
-    box-shadow: 0 0 0 3px rgba(30, 42, 74, 0.12);
-  }
-
-  .day-name {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--text);
-  }
-
-  .day-date {
-    font-size: 12px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.5px;
     color: var(--text-faint);
   }
 
-  .stop-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  .d-name {
+    font-family: var(--font-kai);
+    letter-spacing: 0.5px;
+    color: var(--navy-2);
   }
 
-  .stop-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding-left: 14px;
-    border-left: 2px solid var(--border-soft);
+  .d-note {
+    font-family: var(--font-kai);
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid rgba(217, 185, 106, 0.5);
+    color: var(--gold);
   }
 
-  .stop-title {
-    font-size: 14px;
+  /* 底部：景点 + 地图入口 */
+  .card-foot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px 20px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .spots {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .spots-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--text-faint);
+    margin-right: 2px;
+    white-space: nowrap;
+  }
+
+  .spots-label b {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
     font-weight: 600;
-    color: var(--text);
-  }
-
-  .stop-intro {
-    font-size: 13px;
+    letter-spacing: 0;
     color: var(--text-soft);
-    line-height: 1.6;
   }
 
-  @media (max-width: 768px) {
-    .page { padding: 60px 16px 80px; }
-    .page-title { font-size: 32px; }
-    .map-frame { height: 480px; }
-    .map-toolbar { flex-wrap: wrap; }
+  .chip {
+    font-family: var(--font-kai);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: #fbf8f1;
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    overflow-wrap: anywhere;
+    transition: all 0.25s;
+  }
+
+  .chip:hover {
+    background: #fff;
+    border-color: rgba(217, 185, 106, 0.6);
+    color: var(--navy);
+  }
+
+  .map-link {
+    flex-shrink: 0;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 1px;
+    font-family: var(--font-kai);
+    font-size: 12.5px;
+    letter-spacing: 1px;
+    color: var(--navy-2);
+    border-bottom: 1px solid var(--border);
+    transition: color 0.25s, border-color 0.25s;
+  }
+
+  .map-link:hover {
+    color: var(--gold);
+    border-color: rgba(217, 185, 106, 0.6);
+  }
+
+  /* 收尾 */
+  .tl-end {
+    position: relative;
+    padding: 30px 0 0 62px;
+  }
+
+  .end-dot {
+    position: absolute;
+    left: 9.5px;
+    top: 33px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    box-shadow: 0 0 0 5px var(--bg);
+  }
+
+  .tl-end p {
+    font-family: var(--font-kai);
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--text-faint);
+  }
+
+  /* 入场：默认可见，仅视口外的元素由脚本挂 .pre 隐藏 */
+  .reveal {
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .reveal.pre {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+
+  /* ================================================================
+     响应式
+     ================================================================ */
+  @media (max-width: 880px) {
+    .journey {
+      --pad: 18px;
+      padding: 62px 0 76px;
+    }
+
+    .j-title {
+      font-size: 26px;
+      letter-spacing: 7px;
+      padding-left: 7px;
+    }
+
+    .j-sub {
+      font-size: 13px;
+    }
+
+    .list-head {
+      margin: 40px 0 26px;
+    }
+
+    .lh-text {
+      font-size: 13px;
+      letter-spacing: 4px;
+    }
+
+    .timeline::before {
+      left: 11px;
+    }
+
+    .tl-item {
+      padding-left: 42px;
+      padding-bottom: 22px;
+    }
+
+    .tl-node {
+      width: 23px;
+      height: 23px;
+      top: 20px;
+      font-size: 10px;
+    }
+
+    .tl-item::before {
+      left: 24px;
+      top: 31.5px;
+      width: 18px;
+    }
+
+    .card {
+      padding: 20px 18px 18px;
+      border-radius: 14px;
+    }
+
+    .range-date {
+      font-size: 13.5px;
+      gap: 4px;
+    }
+
+    .range-lunar {
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .card-where {
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    .card-title {
+      font-size: 21px;
+      margin-top: 14px;
+    }
+
+    .card-text {
+      font-size: 14px;
+      line-height: 1.9;
+    }
+
+    .spots {
+      gap: 6px;
+    }
+
+    .chip {
+      font-size: 11.5px;
+      padding: 3px 9px;
+    }
+
+    .tl-end {
+      padding: 26px 0 0 42px;
+    }
+
+    .end-dot {
+      left: 7.5px;
+      top: 29px;
+    }
+  }
+
+  /* 手机：卡片头改为纵向，地点与日期同为左对齐 */
+  @media (max-width: 620px) {
+    .card-head {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-where {
+      text-align: left;
+      letter-spacing: 1px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .j-title {
+      font-size: 23px;
+      letter-spacing: 6px;
+      padding-left: 6px;
+    }
+
+    .card-title {
+      font-size: 19px;
+    }
+
+    .days li {
+      gap: 8px;
+      font-size: 12.5px;
+    }
   }
 </style>
+
+<script>
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.remove('pre');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+  );
+
+  document.querySelectorAll('.reveal').forEach((el) => {
+    // 首屏已可见的元素不做动画，避免闪一下
+    if (el.getBoundingClientRect().top > window.innerHeight * 0.88) {
+      el.classList.add('pre');
+      observer.observe(el);
+    }
+  });
+</script>

@@ -1,19 +1,58 @@
 ---
 import Layout from '../layouts/Layout.astro';
+// 带 data-rg 标记的分区图（由 scripts/prep-radio-map.mjs 生成）
+import rawMap from '../assets/radio-map.rg.svg?raw';
+
+const mapSvg = rawMap.replace(
+  '<svg ',
+  '<svg class="map-svg" role="img" aria-label="中国业余无线电呼号分区图，第 0 至 9 区，可按大区查看" '
+);
+
+// 大区数据：色值取自原图图例，用于信息条上的区号着色
+const regions = [
+  { rg: 1, prefix: 'B1', color: '#e74c3c', provinces: ['北京'] },
+  { rg: 2, prefix: 'B2', color: '#5499c7', provinces: ['黑龙江', '吉林', '辽宁'] },
+  { rg: 3, prefix: 'B3', color: '#f0cf4a', provinces: ['天津', '内蒙古', '河北', '山西'] },
+  { rg: 4, prefix: 'B4', color: '#58d68d', provinces: ['上海', '山东', '江苏'] },
+  { rg: 5, prefix: 'B5', color: '#af7ac5', provinces: ['浙江', '江西', '福建'] },
+  { rg: 6, prefix: 'B6', color: '#f5b041', provinces: ['安徽', '河南', '湖北'] },
+  { rg: 7, prefix: 'B7', color: '#a2d9ce', provinces: ['湖南', '广东', '广西', '海南'] },
+  { rg: 8, prefix: 'B8', color: '#ec7063', provinces: ['四川', '重庆', '贵州', '云南'] },
+  { rg: 9, prefix: 'B9', color: '#7fb3d5', provinces: ['陕西', '甘肃', '宁夏', '青海'] },
+  { rg: 0, prefix: 'B0', color: '#e6b17e', provinces: ['新疆', '西藏'] },
+];
 ---
 
-<Layout title="无线电波 · 月风" active="radio">
+<Layout title="无线电波 · 饮月听风" active="radio">
   <main class="container page">
     <span class="badge badge-brand">无线电波</span>
     <h1 class="page-title">无线电波</h1>
     <p class="page-desc">呼号、证件与业余无线电台分区地图</p>
 
-    <div class="map-wrap">
-      <img
-        class="map-img"
-        src={`${import.meta.env.BASE_URL}radio-map.svg`}
-        alt="中国业余无线电呼号分区图（第 0-9 区）"
-      />
+    <div class="map-card">
+      <div class="map-stage" set:html={mapSvg}></div>
+
+      <div class="region-bar">
+        <div class="rb-picker" role="group" aria-label="按大区查看">
+          {
+            regions.map((r) => (
+              <button
+                class="rb-pick"
+                type="button"
+                data-rg={r.rg}
+                style={`--rgc:${r.color}`}
+                aria-label={`第 ${r.rg} 区：${r.provinces.join('、')}`}
+              >
+                {r.rg}
+              </button>
+            ))
+          }
+        </div>
+
+        <div class="rb-info is-empty" aria-live="polite">
+          <p class="rb-hint">把鼠标移到地图上的省份或右侧图例，也可以点下方区号</p>
+        </div>
+      </div>
     </div>
 
     <p class="map-note">
@@ -40,23 +79,178 @@ import Layout from '../layouts/Layout.astro';
   .page-desc {
     font-size: 15px;
     color: var(--text-soft);
-    margin-bottom: 40px;
+    margin-bottom: 32px;
   }
 
-  .map-wrap {
+  /* ---------- 地图卡片 ---------- */
+  .map-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
     overflow: hidden;
-    padding: 16px;
   }
 
-  .map-img {
+  .map-stage {
+    padding: 14px 14px 10px;
+    background: #fbfdfe;
+  }
+
+  .map-stage :global(svg) {
     width: 100%;
     height: auto;
     display: block;
     border-radius: 8px;
+  }
+
+  /* ---------- 交互：悬停高亮 ---------- */
+  /* 省名文字、引线、锚点不拦截鼠标，否则指向它们时收不到 region */
+  .map-stage :global(.map-svg text),
+  .map-stage :global(.map-svg line),
+  .map-stage :global(.map-svg circle) {
+    pointer-events: none;
+  }
+
+  .map-stage :global(.map-svg [data-rg]) {
+    cursor: pointer;
+    transition: opacity 0.22s ease, filter 0.22s ease, stroke 0.22s ease;
+  }
+
+  /* 有选中区时，其余区退到背景 */
+  .map-stage :global(.map-svg.is-focus [data-rg]) {
+    opacity: 0.22;
+  }
+
+  .map-stage :global(.map-svg [data-rg].on) {
+    opacity: 1;
+    /* 两层：外圈微光让北京这类极小区域也能看见，下方投影给出浮起感 */
+    filter: saturate(1.32) drop-shadow(0 0 3px rgba(20, 36, 58, 0.5))
+      drop-shadow(0 3px 6px rgba(18, 32, 56, 0.26));
+  }
+
+  /* 只给省份轮廓描边，图例小色块不加 */
+  .map-stage :global(.map-svg path.on) {
+    stroke: #14243a;
+    stroke-width: 2.6;
+    stroke-linejoin: round;
+    paint-order: stroke;
+  }
+
+  /* ---------- 底部：区号选择 + 说明 ---------- */
+  .region-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 14px 18px 16px;
+    border-top: 1px solid var(--border-soft);
+    background: #fffdf9;
+  }
+
+  .rb-picker {
+    display: flex;
+    gap: 6px;
+  }
+
+  .rb-pick {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-soft);
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .rb-pick:hover {
+    border-color: var(--rgc);
+    color: var(--navy);
+    transform: translateY(-2px);
+  }
+
+  .rb-pick.active {
+    background: var(--rgc);
+    border-color: var(--rgc);
+    color: #1b2631;
+    box-shadow: 0 4px 12px rgba(30, 42, 74, 0.18);
+  }
+
+  .rb-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 40px;
+  }
+
+  .rb-hint {
+    font-family: var(--font-kai);
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    color: var(--text-faint);
+  }
+
+  .rb-no {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--rgc) 22%, #fff);
+    border: 1px solid var(--rgc);
+    font-family: var(--font-kai);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--navy);
+  }
+
+  .rb-meta {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .rb-meta b {
+    font-family: var(--font-kai);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--navy);
+  }
+
+  .rb-meta i {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--text-faint);
+  }
+
+  .rb-prov {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .rb-chip {
+    font-family: var(--font-kai);
+    font-size: 12.5px;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--rgc) 14%, #fff);
+    border: 1px solid color-mix(in srgb, var(--rgc) 55%, #fff);
+    color: var(--navy-2);
   }
 
   .map-note {
@@ -67,8 +261,149 @@ import Layout from '../layouts/Layout.astro';
   }
 
   @media (max-width: 768px) {
-    .page { padding: 60px 16px 80px; }
-    .page-title { font-size: 32px; }
-    .map-wrap { padding: 8px; }
+    .page {
+      padding: 60px 16px 80px;
+    }
+
+    .page-title {
+      font-size: 32px;
+    }
+
+    .map-stage {
+      padding: 8px 8px 4px;
+    }
+
+    .region-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+      padding: 12px 12px 14px;
+    }
+
+    .rb-picker {
+      justify-content: space-between;
+      gap: 4px;
+    }
+
+    .rb-pick {
+      width: 28px;
+      height: 28px;
+      font-size: 12px;
+    }
+
+    .rb-info {
+      gap: 10px;
+    }
+
+    .rb-no {
+      width: 34px;
+      height: 34px;
+      font-size: 18px;
+    }
+
+    .rb-chip {
+      font-size: 12px;
+      padding: 2px 8px;
+    }
   }
 </style>
+
+<script>
+  interface RegionInfo {
+    prefix: string;
+    color: string;
+    provinces: string[];
+  }
+
+  const REGIONS: Record<string, RegionInfo> = {
+    '1': { prefix: 'B1', color: '#e74c3c', provinces: ['北京'] },
+    '2': { prefix: 'B2', color: '#5499c7', provinces: ['黑龙江', '吉林', '辽宁'] },
+    '3': { prefix: 'B3', color: '#f0cf4a', provinces: ['天津', '内蒙古', '河北', '山西'] },
+    '4': { prefix: 'B4', color: '#58d68d', provinces: ['上海', '山东', '江苏'] },
+    '5': { prefix: 'B5', color: '#af7ac5', provinces: ['浙江', '江西', '福建'] },
+    '6': { prefix: 'B6', color: '#f5b041', provinces: ['安徽', '河南', '湖北'] },
+    '7': { prefix: 'B7', color: '#a2d9ce', provinces: ['湖南', '广东', '广西', '海南'] },
+    '8': { prefix: 'B8', color: '#ec7063', provinces: ['四川', '重庆', '贵州', '云南'] },
+    '9': { prefix: 'B9', color: '#7fb3d5', provinces: ['陕西', '甘肃', '宁夏', '青海'] },
+    '0': { prefix: 'B0', color: '#e6b17e', provinces: ['新疆', '西藏'] },
+  };
+
+  const svg = document.querySelector<SVGSVGElement>('.map-svg');
+  const info = document.querySelector<HTMLElement>('.rb-info');
+  const picks = Array.from(document.querySelectorAll<HTMLButtonElement>('.rb-pick'));
+
+  if (svg && info) {
+    const targets = Array.from(svg.querySelectorAll<SVGElement>('[data-rg]'));
+    let current: string | null = null;
+
+    const renderInfo = (rg: string | null) => {
+      if (rg === null) {
+        info.classList.add('is-empty');
+        info.innerHTML =
+          '<p class="rb-hint">把鼠标移到地图上的省份或右侧图例，也可以点下方区号</p>';
+        return;
+      }
+      const data = REGIONS[rg];
+      if (!data) return;
+      info.classList.remove('is-empty');
+      info.style.setProperty('--rgc', data.color);
+      info.innerHTML = `
+        <span class="rb-no">${rg}</span>
+        <span class="rb-meta">
+          <b>第 ${rg} 区</b>
+          <i>呼号前缀 ${data.prefix}</i>
+        </span>
+        <span class="rb-prov">${data.provinces
+          .map((p) => `<span class="rb-chip">${p}</span>`)
+          .join('')}</span>
+      `;
+    };
+
+    const setRegion = (rg: string | null) => {
+      if (rg === current) return;
+      current = rg;
+      for (const el of targets) {
+        el.classList.toggle('on', rg !== null && el.dataset.rg === rg);
+      }
+      svg.classList.toggle('is-focus', rg !== null);
+      for (const b of picks) b.classList.toggle('active', b.dataset.rg === rg);
+      renderInfo(rg);
+    };
+
+    // 鼠标移入某个省份（或图例色块）；触屏不靠 hover，交给 click
+    svg.addEventListener('pointerover', (e) => {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      const hit = (e.target as Element).closest<SVGElement>('[data-rg]');
+      if (hit?.dataset.rg) setRegion(hit.dataset.rg);
+    });
+
+    // 离开整张地图时复位
+    svg.addEventListener('pointerleave', () => setRegion(null));
+
+    // 点击：触屏为切换（再点取消），鼠标为固定选中
+    svg.addEventListener('click', (e) => {
+      const hit = (e.target as Element).closest<SVGElement>('[data-rg]');
+      const rg = hit?.dataset.rg ?? null;
+      if (!rg) {
+        setRegion(null);
+        return;
+      }
+      const type = (e as PointerEvent).pointerType;
+      const isTouch = type === 'touch' || type === 'pen';
+      setRegion(isTouch && current === rg ? null : rg);
+    });
+
+    // 区号按钮
+    for (const btn of picks) {
+      btn.addEventListener('click', () => {
+        const rg = btn.dataset.rg ?? null;
+        setRegion(current === rg ? null : rg);
+      });
+    }
+
+    // Esc 复位
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') setRegion(null);
+    });
+  }
+</script>
