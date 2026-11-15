@@ -2,16 +2,19 @@
 
 基于 [Astro](https://astro.build) 构建的纯静态个人作品集站点，部署于 GitHub Pages。
 
+> 仓库地址：https://github.com/ring-finger/moon-quench
+> 在线访问：https://ring-finger.github.io/moon-quench/
+
 ## 模块
 
 - **首页** — 导览 + Three.js 星月粒子背景
 - **博客** — 跳转到外部博客（https://blog.soulcottage.top/）
-- **旅游路线** — 按年份倒序的树状结构，点击卡片展开详情
-- **业余无线电** — 呼号、证件与电台分区地图（接入位）
+- **旅游路线** — 按时间倒序的单侧时间轴卡片，点击展开逐日行程与景点
+- **业余无线电** — 呼号、证件与中国业余无线电分区地图（0–9 区，可按大区高亮查看）
 
 ## 技术栈
 
-- Astro 5（纯静态输出）
+- Astro 7（纯静态输出）
 - Three.js（本地引入，构建时打包，不依赖 CDN）
 - 原生 CSS（现代清新风格）
 
@@ -20,13 +23,20 @@
 ```
 src/
 ├── layouts/Layout.astro          # 全局布局（导航 + 页脚）
-├── components/ThreeBackground.astro  # 星月粒子背景
+├── components/
+│   ├── BrandMark.astro           # 品牌标识（深藏青方块 + 「月风」竖排）
+│   └── ThreeBackground.astro     # 星月粒子背景
 ├── styles/global.css             # 全局样式
+├── assets/
+│   ├── radio-map.svg             # 无线电分区图源图（扁平 SVG）
+│   └── radio-map.rg.svg          # 带 data-rg 标记（由脚本生成）
 └── pages/
     ├── index.astro               # 首页导览
     ├── blog.astro                # 博客（外链）
     ├── travel.astro              # 旅游路线
     └── radio.astro               # 业余无线电
+scripts/
+└── prep-radio-map.mjs            # 给分区图打大区标记
 ```
 
 ## 本地开发
@@ -47,7 +57,10 @@ npm run preview    # 本地预览构建产物
 
 > 完整的启动与 Git 提交操作步骤见 [TUTORIAL.md](./TUTORIAL.md)。
 
-## 后续待办
+## 其他脚本
 
-- [ ] 导入旅游路线真实内容（替换 `travel.astro` 中的示例数据）
-- [ ] 接入业余无线电台分区地图成品文件
+```sh
+npm run map:radio  # 重新生成带大区标记的分区图 radio-map.rg.svg
+```
+
+仅在修改 `src/assets/radio-map.svg` 源图后需要运行，输出 `src/assets/radio-map.rg.svg`。

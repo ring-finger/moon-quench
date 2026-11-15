@@ -8,11 +8,13 @@
 
 | 项目 | 版本 |
 | --- | --- |
-| Node.js | >= 22.23.4 |
+| Node.js | >= 22.23.4（当前本机 v26.13.1） |
 | 包管理器 | npm 11.20.0 |
 | 框架 | Astro 7.x |
+| 图形库 | Three.js 0.187.x |
 
-- 远程仓库：`https://github.com/ring-finger/moon-quench.git`
+- 远程仓库：<https://github.com/ring-finger/moon-quench>
+- 在线访问：<https://ring-finger.github.io/moon-quench/>
 - 默认分支：`main`
 - 部署：GitHub Pages（项目站，`base` 为 `/moon-quench/`）
 
@@ -137,6 +139,7 @@ astro dev logs       # 后台服务日志
 astro dev stop       # 停止后台服务
 npm run build        # 构建到 dist/
 npm run preview      # 预览构建产物
+npm run map:radio    # 重新生成分区图（radio-map.rg.svg）
 git status           # 查看改动
 git add .            # 暂存改动
 git commit -m "..."  # 提交

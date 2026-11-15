@@ -15,8 +15,8 @@
   --bg: #f6f3ec;            /* 宣纸暖白底 */
   --bg-card: #ffffff;
   --text: #1e2a4a;
-  --text-soft: #5a6784;
-  --text-faint: #98a2b8;
+  --text-soft: #4a5872;     /* 正文灰，加深一档提升长文可读性 */
+  --text-faint: #8a94a9;    /* 辅助/占位文字，略加深，保留弱化层次 */
   --brand: #1e2a4a;
   --accent: #d9b96a;
 
@@ -45,6 +45,22 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
+
+/* 全站焦点环：月黄描边，贴合品牌，键盘/移动端可见 */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 数字等宽对齐（日期、区号、摩尔斯电码） */
+.tnum,
+.range-date,
+.d-date,
+.rb-pick,
+.cw-code {
+  font-variant-numeric: tabular-nums;
+}
 
 body {
   font-family: var(--font-sans);
@@ -98,6 +114,11 @@ img { max-width: 100%; display: block; }
   letter-spacing: 2px;
   font-family: var(--font-kai);
   color: var(--navy);
+  white-space: nowrap;
+}
+
+.brand > span:last-child {
+  white-space: nowrap;
 }
 
 .brand-static {
@@ -140,9 +161,11 @@ img { max-width: 100%; display: block; }
   letter-spacing: 1px;
   color: var(--text-soft);
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .nav-links a:hover { color: var(--navy); background: var(--border-soft); }
+.nav-links a:active { transform: scale(0.97); }
 .nav-links a.active {
   color: var(--moon-2);
   background: var(--navy);
@@ -178,6 +201,26 @@ img { max-width: 100%; display: block; }
   background: var(--navy);
 }
 
+/* 页面通用版式（.page / .page-title / .page-desc 全站统一） */
+.page {
+  padding: 80px 24px 120px;
+}
+
+.page-title {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  margin: 16px 0 8px;
+  font-family: var(--font-kai);
+  color: var(--navy);
+}
+
+.page-desc {
+  font-size: 15px;
+  color: var(--text-soft);
+  margin-bottom: 24px;
+}
+
 /* 入场动画 */
 .fade-in {
   opacity: 0;
@@ -190,5 +233,31 @@ img { max-width: 100%; display: block; }
 /* 响应式 */
 @media (max-width: 768px) {
   .nav-inner { padding: 0 16px; }
-  .nav-links a { padding: 8px 12px; font-size: 13px; }
+  .nav-links a { padding: 8px 10px; font-size: 13px; }
+  .brand { font-size: 16px; letter-spacing: 1px; }
+
+  .page { padding: 48px 16px 80px; }
+  .page-title { font-size: 30px; }
+  .page-desc { font-size: 14px; }
+}
+
+@media (max-width: 480px) {
+  .nav-inner { padding: 0 12px; height: 56px; }
+  /* 窄屏只留 logo 图标，隐藏「饮月听风」文字，腾出空间给导航 */
+  .brand > span:last-child { display: none; }
+  .brand .logo { width: 30px; height: 30px; }
+  .nav-links { gap: 2px; }
+  .nav-links a { padding: 7px 8px; font-size: 13px; letter-spacing: 0.5px; }
+}
+
+/* 无障碍：用户偏好减少动态时，收敛所有位移/缩放动画，只保留淡入淡出 */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
 }

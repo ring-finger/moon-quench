@@ -1,0 +1,77 @@
+---
+interface Props {
+  active: 'map' | 'morse';
+}
+const { active } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const tabs = [
+  { key: 'map', label: '地图', href: `${base}radio/` },
+  { key: 'morse', label: '摩尔斯电码', href: `${base}radio/morse/` },
+];
+---
+
+<nav class="radio-tabs" role="tablist" aria-label="无线电波内容切换">
+  {
+    tabs.map((t) => (
+      <a
+        href={t.href}
+        class:list={['radio-tab', { active: t.key === active }]}
+        role="tab"
+        aria-selected={t.key === active ? 'true' : 'false'}
+      >
+        {t.label}
+      </a>
+    ))
+  }
+</nav>
+
+<style>
+  .radio-tabs {
+    display: inline-flex;
+    gap: 4px;
+    padding: 5px;
+    border-radius: 999px;
+    background: var(--border-soft);
+    border: 1px solid var(--border);
+  }
+
+  .radio-tab {
+    padding: 8px 22px;
+    border-radius: 999px;
+    font-family: var(--font-kai);
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    color: var(--text-soft);
+    white-space: nowrap;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .radio-tab:hover {
+    color: var(--navy);
+  }
+
+  .radio-tab:active {
+    transform: scale(0.96);
+  }
+
+  .radio-tab.active {
+    background: var(--navy);
+    color: var(--moon-2);
+    font-weight: 600;
+    box-shadow: 0 3px 10px rgba(30, 42, 74, 0.2);
+  }
+
+  @media (max-width: 480px) {
+    .radio-tabs {
+      display: flex;
+      width: 100%;
+    }
+
+    .radio-tab {
+      flex: 1;
+      text-align: center;
+      padding: 9px 12px;
+      font-size: 14px;
+    }
+  }
+</style>

@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import RadioTabs from '../components/RadioTabs.astro';
 // 带 data-rg 标记的分区图（由 scripts/prep-radio-map.mjs 生成）
 import rawMap from '../assets/radio-map.rg.svg?raw';
 
@@ -27,10 +28,31 @@ const regions = [
   <main class="container page">
     <span class="badge badge-brand">无线电波</span>
     <h1 class="page-title">无线电波</h1>
-    <p class="page-desc">呼号、证件与业余无线电台分区地图</p>
+    <p class="page-desc">中国业余无线电呼号分区地图</p>
+
+    <div class="radio-tabs-row">
+      <RadioTabs active="map" />
+    </div>
 
     <div class="map-card">
+      <div class="map-stage-head">
+        <button class="fullscreen-btn" type="button" aria-label="横屏全屏查看地图">
+          <span class="fs-icon" aria-hidden="true"></span>
+          <span>横屏查看</span>
+        </button>
+      </div>
       <div class="map-stage" set:html={mapSvg}></div>
+
+      <div class="map-fullscreen" hidden>
+        <div class="fs-topbar">
+          <span class="fs-title">中国业余无线电呼号分区图</span>
+          <button class="fs-close" type="button" aria-label="退出横屏查看">
+            <span class="fs-close-x" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="fs-stage" set:html={mapSvg}></div>
+        <p class="fs-hint">点击地图可查看大区，点击右上角关闭</p>
+      </div>
 
       <div class="region-bar">
         <div class="rb-picker" role="group" aria-label="按大区查看">
@@ -63,23 +85,8 @@ const regions = [
 </Layout>
 
 <style>
-  .page {
-    padding: 80px 24px 120px;
-  }
-
-  .page-title {
-    font-size: 40px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    margin: 16px 0 8px;
-    font-family: var(--font-kai);
-    color: var(--navy);
-  }
-
-  .page-desc {
-    font-size: 15px;
-    color: var(--text-soft);
-    margin-bottom: 32px;
+  .radio-tabs-row {
+    margin-bottom: 28px;
   }
 
   /* ---------- 地图卡片 ---------- */
@@ -89,6 +96,69 @@ const regions = [
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
     overflow: hidden;
+  }
+
+  .map-stage-head {
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 14px 0;
+  }
+
+  .fullscreen-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-family: var(--font-kai);
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--navy-2);
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .fullscreen-btn:hover {
+    border-color: var(--gold);
+    color: var(--navy);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(30, 42, 74, 0.12);
+  }
+
+  .fullscreen-btn:active {
+    transform: translateY(0) scale(0.97);
+  }
+
+  .fs-icon {
+    position: relative;
+    width: 13px;
+    height: 11px;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+  }
+
+  .fs-icon::before,
+  .fs-icon::after {
+    content: '';
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-style: solid;
+    border-color: currentColor;
+  }
+
+  .fs-icon::before {
+    top: -2px;
+    left: -2px;
+    border-width: 1.5px 0 0 1.5px;
+  }
+
+  .fs-icon::after {
+    bottom: -2px;
+    right: -2px;
+    border-width: 0 1.5px 1.5px 0;
   }
 
   .map-stage {
@@ -173,6 +243,10 @@ const regions = [
     transform: translateY(-2px);
   }
 
+  .rb-pick:active {
+    transform: translateY(0) scale(0.9);
+  }
+
   .rb-pick.active {
     background: var(--rgc);
     border-color: var(--rgc);
@@ -253,6 +327,157 @@ const regions = [
     color: var(--navy-2);
   }
 
+  /* ---------- 横屏全屏查看 ---------- */
+  :global(body.fs-open) {
+    overflow: hidden;
+  }
+
+  .map-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    background: #0d1726;
+  }
+
+  .map-fullscreen[hidden] {
+    display: none;
+  }
+
+  .fs-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    color: #e8edf3;
+  }
+
+  .fs-title {
+    font-family: var(--font-kai);
+    font-size: 15px;
+    letter-spacing: 1.5px;
+    color: var(--gold);
+  }
+
+  .fs-close {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: all 0.22s ease;
+  }
+
+  .fs-close:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .fs-close:active {
+    transform: scale(0.92);
+  }
+
+  .fs-close-x {
+    position: relative;
+    width: 16px;
+    height: 16px;
+  }
+
+  .fs-close-x::before,
+  .fs-close-x::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 1.5px;
+    background: #e8edf3;
+    border-radius: 1px;
+  }
+
+  .fs-close-x::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  .fs-close-x::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+  }
+
+  .fs-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    overflow: hidden;
+  }
+
+  .fs-stage :global(svg) {
+    width: auto;
+    height: 100%;
+    max-width: none;
+    display: block;
+    border-radius: 6px;
+  }
+
+  /* 竖屏手机：自动把地图旋转 90°，铺满横屏视角，无需手动转手机 */
+  @media (orientation: portrait) {
+    .fs-stage :global(svg) {
+      width: auto;
+      height: 100vw;
+      max-width: none;
+      transform: rotate(90deg);
+    }
+
+    .fs-hint {
+      display: none;
+    }
+  }
+
+  /* 全屏态也复用悬停/选中的高亮规则 */
+  .fs-stage :global(.map-svg text),
+  .fs-stage :global(.map-svg line),
+  .fs-stage :global(.map-svg circle) {
+    pointer-events: none;
+  }
+
+  .fs-stage :global(.map-svg [data-rg]) {
+    cursor: pointer;
+    transition: opacity 0.22s ease, filter 0.22s ease, stroke 0.22s ease;
+  }
+
+  .fs-stage :global(.map-svg.is-focus [data-rg]) {
+    opacity: 0.22;
+  }
+
+  .fs-stage :global(.map-svg [data-rg].on) {
+    opacity: 1;
+    filter: saturate(1.32) drop-shadow(0 0 3px rgba(20, 36, 58, 0.5))
+      drop-shadow(0 3px 6px rgba(18, 32, 56, 0.26));
+  }
+
+  .fs-stage :global(.map-svg path.on) {
+    stroke: #14243a;
+    stroke-width: 2.6;
+    stroke-linejoin: round;
+    paint-order: stroke;
+  }
+
+  .fs-hint {
+    padding: 8px 0 12px;
+    text-align: center;
+    font-family: var(--font-kai);
+    font-size: 12.5px;
+    letter-spacing: 1px;
+    color: rgba(232, 237, 243, 0.6);
+  }
+
   .map-note {
     margin-top: 16px;
     font-size: 12px;
@@ -261,16 +486,16 @@ const regions = [
   }
 
   @media (max-width: 768px) {
-    .page {
-      padding: 60px 16px 80px;
-    }
-
-    .page-title {
-      font-size: 32px;
+    .radio-tabs-row {
+      margin-bottom: 20px;
     }
 
     .map-stage {
       padding: 8px 8px 4px;
+    }
+
+    .map-stage-head {
+      padding: 8px 10px 0;
     }
 
     .region-bar {
@@ -331,6 +556,11 @@ const regions = [
   const svg = document.querySelector<SVGSVGElement>('.map-svg');
   const info = document.querySelector<HTMLElement>('.rb-info');
   const picks = Array.from(document.querySelectorAll<HTMLButtonElement>('.rb-pick'));
+
+  const fullscreen = document.querySelector<HTMLElement>('.map-fullscreen');
+  const fsStage = fullscreen?.querySelector<HTMLElement>('.fs-stage');
+  const fsClose = fullscreen?.querySelector<HTMLButtonElement>('.fs-close');
+  const openBtn = document.querySelector<HTMLButtonElement>('.fullscreen-btn');
 
   if (svg && info) {
     const targets = Array.from(svg.querySelectorAll<SVGElement>('[data-rg]'));
@@ -404,6 +634,70 @@ const regions = [
     // Esc 复位
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') setRegion(null);
+    });
+  }
+
+  /* ---------- 横屏全屏查看 ---------- */
+  if (fullscreen && fsStage && fsClose && openBtn) {
+    // 全屏层内部的地图，复用同样的「选中大区」交互（独立实例，互不干扰）
+    const fsSvg = fsStage.querySelector<SVGSVGElement>('.map-svg');
+    if (fsSvg) {
+      const fsTargets = Array.from(fsSvg.querySelectorAll<SVGElement>('[data-rg]'));
+      let fsCurrent: string | null = null;
+
+      const fsSet = (rg: string | null) => {
+        if (rg === fsCurrent) return;
+        fsCurrent = rg;
+        for (const el of fsTargets) {
+          el.classList.toggle('on', rg !== null && el.dataset.rg === rg);
+        }
+        fsSvg.classList.toggle('is-focus', rg !== null);
+      };
+
+      fsSvg.addEventListener('pointerover', (e) => {
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        const hit = (e.target as Element).closest<SVGElement>('[data-rg]');
+        if (hit?.dataset.rg) fsSet(hit.dataset.rg);
+      });
+
+      fsSvg.addEventListener('pointerleave', () => fsSet(null));
+
+      fsSvg.addEventListener('click', (e) => {
+        const hit = (e.target as Element).closest<SVGElement>('[data-rg]');
+        const rg = hit?.dataset.rg ?? null;
+        if (!rg) {
+          fsSet(null);
+          return;
+        }
+        const type = (e as PointerEvent).pointerType;
+        const isTouch = type === 'touch' || type === 'pen';
+        fsSet(isTouch && fsCurrent === rg ? null : rg);
+      });
+    }
+
+    let lastFocus: Element | null = null;
+
+    const open = () => {
+      lastFocus = document.activeElement;
+      fullscreen.hidden = false;
+      document.body.classList.add('fs-open');
+    };
+
+    const close = () => {
+      fullscreen.hidden = true;
+      document.body.classList.remove('fs-open');
+      (lastFocus as HTMLElement | null)?.focus?.();
+    };
+
+    openBtn.addEventListener('click', open);
+    fsClose.addEventListener('click', close);
+
+    // 点背景空白处或按 Esc 也可退出
+    fsStage.addEventListener('click', (e) => {
+      if (e.target === fsStage) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !fullscreen.hidden) close();
     });
   }
 </script>

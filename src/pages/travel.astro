@@ -339,6 +339,10 @@ const trips = [
     box-shadow: var(--shadow-md);
   }
 
+  .card:active {
+    transform: translateY(-1px);
+  }
+
   /* 头部：左时间范围，右地点 */
   .card-head {
     display: flex;
@@ -414,6 +418,7 @@ const trips = [
     line-height: 1.4;
     color: var(--navy);
     margin: 17px 0 0;
+    text-wrap: balance;
   }
 
   .card-photo {
@@ -535,6 +540,10 @@ const trips = [
     background: #fff;
     border-color: rgba(217, 185, 106, 0.6);
     color: var(--navy);
+  }
+
+  .chip:active {
+    transform: scale(0.96);
   }
 
   .map-link {

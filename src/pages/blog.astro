@@ -20,6 +20,7 @@ const blogUrl = 'https://blog.soulcottage.top/';
 </Layout>
 
 <style>
+  /* blog 页居中布局：仅覆盖 padding 与布局，标题/描述字体走全局 */
   .page {
     padding: 120px 24px;
     text-align: center;
@@ -29,17 +30,7 @@ const blogUrl = 'https://blog.soulcottage.top/';
     gap: 16px;
   }
 
-  .page-title {
-    font-size: 40px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    font-family: var(--font-kai);
-    color: var(--navy);
-  }
-
   .page-desc {
-    font-size: 16px;
-    color: var(--text-soft);
     max-width: 480px;
   }
 
@@ -49,7 +40,7 @@ const blogUrl = 'https://blog.soulcottage.top/';
     align-items: center;
     gap: 10px;
     padding: 14px 32px;
-    border-radius: 12px;
+    border-radius: var(--radius-sm);
     background: var(--grad-brand);
     color: #fff;
     font-weight: 600;
@@ -61,6 +52,10 @@ const blogUrl = 'https://blog.soulcottage.top/';
   .btn-jump:hover {
     transform: translateY(-2px);
     box-shadow: 0 20px 48px rgba(30, 42, 74, 0.24);
+  }
+
+  .btn-jump:active {
+    transform: translateY(0) scale(0.98);
   }
 
   .btn-jump span { transition: transform 0.25s; }
