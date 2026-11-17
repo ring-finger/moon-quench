@@ -3,11 +3,10 @@
 基于 [Astro](https://astro.build) 构建的纯静态个人作品集站点，部署于 GitHub Pages。
 
 > 仓库地址：https://github.com/ring-finger/moon-quench
-> 在线访问：https://ring-finger.github.io/moon-quench/
 
 ## 模块
 
-- **首页** — 品牌入口（「饮月听风」标语 + 三个模块卡片）
+- **首页（根路径）** — 名片页（公众号二维码 + 呼号 + 邮箱）
 - **灵犀小筑** — 跳转到外部博客（https://blog.soulcottage.top/）
 - **旅游小记** — 按时间倒序的单侧时间轴卡片，点击展开逐日行程与景点
 - **无线电波** — 呼号分区地图（0–9 区，可按大区高亮）+ 摩尔斯电码学习方法
@@ -30,7 +29,7 @@ src/
 │   ├── radio-map.svg             # 无线电分区图源图（扁平 SVG）
 │   └── radio-map.rg.svg          # 带 data-rg 标记（由脚本生成）
 └── pages/
-    ├── index.astro               # 首页（品牌入口）
+    ├── index.astro               # 根路径名片页（二维码 + 联系方式）
     ├── blog.astro                # 灵犀小筑（外链）
     ├── travel.astro              # 旅游小记
     ├── radio.astro               # 无线电波（分区地图）

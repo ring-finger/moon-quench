@@ -5,24 +5,16 @@ import BrandMark from '../components/BrandMark.astro';
 interface Props {
   title: string;
   description?: string;
-  active?: string;
   /** 布局模式：home 首页（无导航栏） | page 功能页（有导航但无返回首页入口） */
   mode?: 'home' | 'page';
 }
 const {
   title,
   description = '饮月听风 · 个人作品集',
-  active = '',
   mode = 'page',
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL;
-// 功能页导航：不含「首页」，也不提供返回首页的入口
-const navItems = [
-  { href: `${base}blog`, label: '灵犀小筑', key: 'blog' },
-  { href: `${base}travel`, label: '旅游小记', key: 'travel' },
-  { href: `${base}radio`, label: '无线电波', key: 'radio' },
-];
 ---
 
 <!DOCTYPE html>
@@ -40,22 +32,13 @@ const navItems = [
       mode === 'page' && (
         <nav class="site-nav">
           <div class="nav-inner">
-            <!-- 品牌标识不链接，不提供返回首页入口 -->
+            <!-- 品牌标识不链接，不提供返回首页入口；子模块之间也不互相跳转 -->
             <span class="brand brand-static">
               <span class="logo logo-svg">
                 <BrandMark size={32} />
               </span>
               <span>饮月听风</span>
             </span>
-            <div class="nav-links">
-              {
-                navItems.map((item) => (
-                  <a href={item.href} class={active === item.key ? 'active' : ''}>
-                    {item.label}
-                  </a>
-                ))
-              }
-            </div>
           </div>
         </nav>
       )

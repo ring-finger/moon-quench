@@ -146,32 +146,6 @@ img { max-width: 100%; display: block; }
   height: 100%;
 }
 
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.nav-links a {
-  padding: 8px 16px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: var(--font-kai);
-  letter-spacing: 1px;
-  color: var(--text-soft);
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.nav-links a:hover { color: var(--navy); background: var(--border-soft); }
-.nav-links a:active { transform: scale(0.97); }
-.nav-links a.active {
-  color: var(--moon-2);
-  background: var(--navy);
-  font-weight: 600;
-}
-
 /* 页脚 */
 .site-footer {
   border-top: 1px solid var(--border-soft);
@@ -233,7 +207,6 @@ img { max-width: 100%; display: block; }
 /* 响应式 */
 @media (max-width: 768px) {
   .nav-inner { padding: 0 16px; }
-  .nav-links a { padding: 8px 10px; font-size: 13px; }
   .brand { font-size: 16px; letter-spacing: 1px; }
 
   .page { padding: 48px 16px 80px; }
@@ -243,11 +216,9 @@ img { max-width: 100%; display: block; }
 
 @media (max-width: 480px) {
   .nav-inner { padding: 0 12px; height: 56px; }
-  /* 窄屏只留 logo 图标，隐藏「饮月听风」文字，腾出空间给导航 */
+  /* 窄屏只留 logo 图标，隐藏「饮月听风」文字 */
   .brand > span:last-child { display: none; }
   .brand .logo { width: 30px; height: 30px; }
-  .nav-links { gap: 2px; }
-  .nav-links a { padding: 7px 8px; font-size: 13px; letter-spacing: 0.5px; }
 }
 
 /* 无障碍：用户偏好减少动态时，收敛所有位移/缩放动画，只保留淡入淡出 */

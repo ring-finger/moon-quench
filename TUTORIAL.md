@@ -13,7 +13,6 @@
 | 框架 | Astro 7.x |
 
 - 远程仓库：<https://github.com/ring-finger/moon-quench>
-- 在线访问：<https://ring-finger.github.io/moon-quench/>
 - 默认分支：`main`
 - 部署：GitHub Pages（项目站，`base` 为 `/moon-quench/`）
 

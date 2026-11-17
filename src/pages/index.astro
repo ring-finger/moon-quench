@@ -2,209 +2,131 @@
 import Layout from '../layouts/Layout.astro';
 
 const base = import.meta.env.BASE_URL;
-
-const modules = [
-  {
-    href: `${base}blog`,
-    title: '灵犀小筑',
-    en: 'THOUGHTS',
-    desc: '灵犀一点，落笔成篇',
-  },
-  {
-    href: `${base}travel`,
-    title: '旅游小记',
-    en: 'JOURNEYS',
-    desc: '山水行迹，且行且记',
-  },
-  {
-    href: `${base}radio`,
-    title: '无线电波',
-    en: 'AIRWAVES',
-    desc: '天地电波，远方回声',
-  },
-];
 ---
 
-<Layout title="饮月听风 · 个人小站" mode="home">
+<Layout title="饮月听风 · BA4IWA" mode="home">
   <main class="home">
-    <section class="hero">
-      <span class="badge badge-brand">闲时饮月 · 醉后听风</span>
-      <h1 class="brand-title">
-        <span>饮月</span><span>听风</span>
-      </h1>
-      <p class="hero-sub">记录作品、旅途与电波，一个安静的角落</p>
-    </section>
+    <section class="card">
+      <span class="badge badge-brand">饮月听风</span>
+      <p class="intro">一个安静的个人角落，记录作品、旅途与电波。</p>
 
-    <section class="modules">
-      {
-        modules.map((m) => (
-          <a class="module-card fade-in" href={m.href}>
-            <span class="m-en">{m.en}</span>
-            <h2>{m.title}</h2>
-            <p>{m.desc}</p>
-            <span class="m-enter">进入 →</span>
-          </a>
-        ))
-      }
+      <div class="qrcode">
+        <img src={`${base}qrcode-gzh.jpg`} alt="微信公众号「饮月听风」二维码" width="220" height="220" />
+        <p class="qr-hint">扫码关注「饮月听风」公众号</p>
+      </div>
+
+      <div class="contact">
+        <p class="c-row">
+          <span class="c-label">邮箱</span>
+          <a class="c-value" href="mailto:minionzw@163.com">minionzw@163.com</a>
+        </p>
+        <p class="c-row">
+          <span class="c-label">呼号</span>
+          <span class="c-value">BA4IWA</span>
+        </p>
+      </div>
     </section>
   </main>
 </Layout>
 
 <style>
   .home {
-    position: relative;
     min-height: 100dvh;
     display: flex;
-    flex-direction: column;
-  }
-
-  .hero {
-    position: relative;
-    z-index: 2;
-    text-align: center;
-    padding: 72px 24px 28px;
-  }
-
-  .hero .badge {
-    pointer-events: auto;
-  }
-
-  .brand-title {
-    display: flex;
+    align-items: center;
     justify-content: center;
-    gap: 16px;
-    margin: 22px 0 12px;
-    font-family: var(--font-kai);
-    font-weight: 500;
+    padding: 24px;
   }
 
-  .brand-title span {
-    font-size: 58px;
-    line-height: 1;
-    color: var(--navy);
-    letter-spacing: 4px;
-  }
-
-  .hero-sub {
-    font-size: 14px;
-    color: var(--text-soft);
-    letter-spacing: 2px;
-    font-family: var(--font-kai);
-  }
-
-  .modules {
-    position: relative;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    padding: 12px 24px 44px;
-    max-width: 780px;
+  .card {
     width: 100%;
-    margin: auto auto 0;
-  }
-
-  .module-card {
+    max-width: 400px;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 18px 20px 16px;
-    box-shadow: var(--shadow-md);
-    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 40px 32px;
+    text-align: center;
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    position: relative;
+    align-items: center;
+    gap: 16px;
   }
 
-  .module-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(217, 185, 106, 0.65);
-    box-shadow: var(--shadow-lg);
+  .badge {
+    font-family: var(--font-kai);
   }
 
-  .module-card:active {
-    transform: translateY(-1px) scale(0.98);
+  .name {
+    font-family: var(--font-kai);
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    color: var(--navy);
   }
 
-  .m-en {
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: rgba(217, 185, 106, 0.85);
-    text-transform: uppercase;
-    font-family: var(--font-sans);
+  .intro {
+    font-family: var(--font-kai);
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: var(--text-soft);
+  }
+
+  .qrcode {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .qrcode img {
+    width: 220px;
+    height: 220px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+
+  .qr-hint {
+    font-family: var(--font-kai);
+    font-size: 13px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+  }
+
+  .contact {
+    width: 100%;
+    margin-top: 12px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .c-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    transition: color 0.3s;
+    justify-content: center;
+    gap: 12px;
+    font-size: 14px;
   }
 
-  .m-en::before {
-    content: '';
-    width: 16px;
-    height: 1px;
-    background: rgba(217, 185, 106, 0.5);
-    transition: all 0.3s;
-  }
-
-  .module-card:hover .m-en {
-    color: var(--gold);
-  }
-
-  .module-card:hover .m-en::before {
-    width: 26px;
-    background: var(--gold);
-  }
-
-  .module-card h2 {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--navy);
-    font-family: var(--font-kai);
-    letter-spacing: 2px;
-  }
-
-  .module-card p {
-    font-size: 12px;
-    color: var(--text-soft);
-    flex: 1;
+  .c-label {
+    color: var(--text-faint);
     font-family: var(--font-kai);
     letter-spacing: 1px;
-    line-height: 1.5;
+    flex-shrink: 0;
   }
 
-  .m-enter {
-    font-size: 12px;
-    font-weight: 600;
+  .c-value {
+    color: var(--navy);
+    font-weight: 500;
+    font-family: var(--font-sans);
+    letter-spacing: 0.5px;
+  }
+
+  a.c-value:hover {
     color: var(--gold);
-    opacity: 0;
-    transform: translateX(-6px);
-    transition: all 0.3s;
-  }
-
-  .module-card:hover .m-enter {
-    opacity: 1;
-    transform: translateX(0);
-  }
-
-  @media (max-width: 768px) {
-    .hero { padding: 52px 20px 20px; }
-    .brand-title span { font-size: 42px; }
-    .modules { grid-template-columns: 1fr; padding: 8px 18px 28px; gap: 10px; }
   }
 </style>
-
-<script>
-  // 入场动画：滚动进入视口时淡入
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
-      });
-    },
-    { threshold: 0.2 }
-  );
-  document.querySelectorAll('.fade-in').forEach((el) => observer.observe(el));
-</script>
