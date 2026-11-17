@@ -7,16 +7,15 @@
 
 ## 模块
 
-- **首页** — 导览 + Three.js 星月粒子背景
-- **博客** — 跳转到外部博客（https://blog.soulcottage.top/）
-- **旅游路线** — 按时间倒序的单侧时间轴卡片，点击展开逐日行程与景点
-- **业余无线电** — 呼号、证件与中国业余无线电分区地图（0–9 区，可按大区高亮查看）
+- **首页** — 品牌入口（「饮月听风」标语 + 三个模块卡片）
+- **灵犀小筑** — 跳转到外部博客（https://blog.soulcottage.top/）
+- **旅游小记** — 按时间倒序的单侧时间轴卡片，点击展开逐日行程与景点
+- **无线电波** — 呼号分区地图（0–9 区，可按大区高亮）+ 摩尔斯电码学习方法
 
 ## 技术栈
 
 - Astro 7（纯静态输出）
-- Three.js（本地引入，构建时打包，不依赖 CDN）
-- 原生 CSS（现代清新风格）
+- 原生 CSS（现代清新风格，CSS 变量统一主题）
 
 ## 项目结构
 
@@ -25,16 +24,18 @@ src/
 ├── layouts/Layout.astro          # 全局布局（导航 + 页脚）
 ├── components/
 │   ├── BrandMark.astro           # 品牌标识（深藏青方块 + 「月风」竖排）
-│   └── ThreeBackground.astro     # 星月粒子背景
+│   └── RadioTabs.astro           # 无线电波页 Tab 切换（地图 / 摩尔斯）
 ├── styles/global.css             # 全局样式
 ├── assets/
 │   ├── radio-map.svg             # 无线电分区图源图（扁平 SVG）
 │   └── radio-map.rg.svg          # 带 data-rg 标记（由脚本生成）
 └── pages/
-    ├── index.astro               # 首页导览
-    ├── blog.astro                # 博客（外链）
-    ├── travel.astro              # 旅游路线
-    └── radio.astro               # 业余无线电
+    ├── index.astro               # 首页（品牌入口）
+    ├── blog.astro                # 灵犀小筑（外链）
+    ├── travel.astro              # 旅游小记
+    ├── radio.astro               # 无线电波（分区地图）
+    └── radio/
+        └── morse.astro           # 摩尔斯电码学习方法
 scripts/
 └── prep-radio-map.mjs            # 给分区图打大区标记
 ```

@@ -37,10 +37,13 @@ const morseNumbers = [
     <!-- 字母电码 -->
     <div class="cw-card">
       <div class="cw-card-head">
-        <h3>字母电码</h3>
-        <p>把点（·，读作「嘀」，短促）与划（−，读作「哒」，拉长）记成节奏，而非死记符号</p>
+        <div class="cw-head-main">
+          <h3>字母电码</h3>
+          <p>把点（·，读作「嘀」，短促）与划（−，读作「哒」，拉长）记成节奏，而非死记符号</p>
+        </div>
+        <button type="button" class="cw-shuffle" data-shuffle="grid-letters" title="随机打乱字母顺序">⇄ 乱序</button>
       </div>
-      <div class="cw-grid" role="list">
+      <div class="cw-grid" id="grid-letters" role="list">
         {
           morseTable.map((m) => (
             <button
@@ -62,10 +65,13 @@ const morseNumbers = [
     <!-- 数字电码 -->
     <div class="cw-card">
       <div class="cw-card-head">
-        <h3>数字电码</h3>
-        <p>0–9 数字的对应电码，常用于呼号与信号报告</p>
+        <div class="cw-head-main">
+          <h3>数字电码</h3>
+          <p>0–9 数字的对应电码，常用于呼号与信号报告</p>
+        </div>
+        <button type="button" class="cw-shuffle" data-shuffle="grid-numbers" title="随机打乱数字顺序">⇄ 乱序</button>
       </div>
-      <div class="cw-grid" role="list">
+      <div class="cw-grid" id="grid-numbers" role="list">
         {
           morseNumbers.map((n) => (
             <button
@@ -171,7 +177,7 @@ const morseNumbers = [
       </ul>
     </div>
 
-    <p class="cw-credit">整理 · BA4IWA　/　技术支持 · BI4JVV　BI4MPY</p>
+    <p class="cw-credit">开发 · BA4IWA　/　摩尔斯码内容支持 · BI4JVV　BI4MPY</p>
   </main>
 </Layout>
 
@@ -240,6 +246,29 @@ const morseNumbers = [
       });
     });
   })();
+
+  // 乱序：点击「乱序」按钮，打乱对应网格内卡片顺序（Fisher-Yates，每次随机）
+  (() => {
+    document.querySelectorAll('.cw-shuffle[data-shuffle]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const grid = document.getElementById(btn.getAttribute('data-shuffle'));
+        if (!grid) return;
+
+        const cells = Array.from(grid.children);
+        // Fisher-Yates 洗牌
+        for (let i = cells.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [cells[i], cells[j]] = [cells[j], cells[i]];
+        }
+        // 重新按新顺序挂回 DOM
+        cells.forEach((cell) => grid.appendChild(cell));
+
+        // 按钮短促反馈
+        btn.classList.add('is-shuffling');
+        setTimeout(() => btn.classList.remove('is-shuffling'), 300);
+      });
+    });
+  })();
 </script>
 
 <style>
@@ -256,6 +285,18 @@ const morseNumbers = [
     margin-bottom: 20px;
   }
 
+  .cw-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .cw-head-main {
+    flex: 1;
+    min-width: 0;
+  }
+
   .cw-card-head h3 {
     font-family: var(--font-kai);
     font-size: 19px;
@@ -268,6 +309,46 @@ const morseNumbers = [
     margin-top: 6px;
     font-size: 13px;
     color: var(--text-soft);
+  }
+
+  /* 乱序按钮 */
+  .cw-shuffle {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-card);
+    color: var(--navy);
+    font-family: var(--font-kai);
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
+  }
+
+  .cw-shuffle:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .cw-shuffle:active {
+    transform: scale(0.96);
+  }
+
+  .cw-shuffle:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+  }
+
+  .cw-shuffle.is-shuffling {
+    border-color: var(--gold);
+    background: color-mix(in srgb, var(--gold) 20%, #fff);
+    color: var(--navy);
   }
 
   /* 图文记忆网格 */
@@ -564,6 +645,11 @@ const morseNumbers = [
   @media (max-width: 768px) {
     .cw-card {
       padding: 18px 16px 20px;
+    }
+
+    .cw-shuffle {
+      padding: 5px 11px;
+      font-size: 12px;
     }
 
     .cw-grid {

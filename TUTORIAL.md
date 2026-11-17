@@ -11,7 +11,6 @@
 | Node.js | >= 22.23.4（当前本机 v26.13.1） |
 | 包管理器 | npm 11.20.0 |
 | 框架 | Astro 7.x |
-| 图形库 | Three.js 0.187.x |
 
 - 远程仓库：<https://github.com/ring-finger/moon-quench>
 - 在线访问：<https://ring-finger.github.io/moon-quench/>
@@ -63,6 +62,18 @@ astro dev --background
 | `astro dev stop` | 停止后台服务 |
 
 > 说明：`astro dev --background` 来自项目的 `AGENTS.md` 约定，适合在编辑器/Agent 环境下使用；个人在终端调试时直接用 `npm run dev` 更直观。
+
+### 1.3 手机局域网访问（真机预览）
+
+默认 dev 服务器只监听本机（`localhost`），手机通过局域网 IP 访问需显式绑定：
+
+```sh
+npm run dev -- --host 0.0.0.0
+```
+
+- 电脑与手机连同一 WiFi，用 `ipconfig` 查电脑局域网 IP（如 `192.168.110.28`）。
+- 手机浏览器访问 `http://<电脑IP>:4321/moon-quench/radio/`（注意带 `/moon-quench/` 前缀）。
+- 若提示 Node 版本不支持，确认用的是本机 v26.13.1（`node -v` 核对），而非其他旧版本。
 
 ---
 
@@ -150,5 +161,5 @@ git push origin main # 推送
 
 ## 5. 关联文档
 
-- [README.md](./README.md) — 项目介绍、技术栈、结构、待办
+- [README.md](./README.md) — 项目介绍、技术栈、结构、模块
 - [AGENTS.md](./AGENTS.md) — 开发约定（后台启动方式、文档链接）

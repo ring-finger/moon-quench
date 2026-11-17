@@ -14,7 +14,6 @@
     "map:radio": "node scripts/prep-radio-map.mjs"
   },
   "dependencies": {
-    "astro": "^7.4.12",
-    "three": "^0.187.0"
+    "astro": "^7.4.12"
   }
 }
