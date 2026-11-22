@@ -157,7 +157,7 @@ img { max-width: 100%; display: block; }
   letter-spacing: 1px;
 }
 
-/* 访问量统计栏（不蒜子） */
+/* 访问量统计栏（不蒜子 busuanzi.cc） */
 .busuanzi-bar {
   display: flex;
   align-items: center;
@@ -178,15 +178,10 @@ img { max-width: 100%; display: block; }
   user-select: none;
 }
 
-.busuanzi-bar span[id^="busuanzi_value"] {
+.busuanzi-bar span[id^="busuanzi_"] {
   color: var(--navy);
   font-weight: 600;
   font-family: var(--font-sans);
-}
-
-/* 不蒜子脚本尚未返回数据前，隐藏整段统计栏，避免闪现空数字 */
-.busuanzi-bar:not(.busuanzi-loaded) {
-  visibility: hidden;
 }
 
 /* 通用按钮/徽标 */
