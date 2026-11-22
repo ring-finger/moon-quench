@@ -157,6 +157,38 @@ img { max-width: 100%; display: block; }
   letter-spacing: 1px;
 }
 
+/* 访问量统计栏（不蒜子） */
+.busuanzi-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 32px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-family: var(--font-kai);
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.busuanzi-bar .sep {
+  color: var(--border);
+  user-select: none;
+}
+
+.busuanzi-bar span[id^="busuanzi_value"] {
+  color: var(--navy);
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+/* 不蒜子脚本尚未返回数据前，隐藏整段统计栏，避免闪现空数字 */
+.busuanzi-bar:not(.busuanzi-loaded) {
+  visibility: hidden;
+}
+
 /* 通用按钮/徽标 */
 .badge {
   display: inline-flex;

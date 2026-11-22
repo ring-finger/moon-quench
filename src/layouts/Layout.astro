@@ -53,5 +53,48 @@ const base = import.meta.env.BASE_URL;
         </footer>
       )
     }
+
+    <!-- 访问量统计（不蒜子） -->
+    <div class="busuanzi-bar">
+      <span id="busuanzi_container_today_pv">今日访问 <span id="busuanzi_value_today_pv"></span> 次</span>
+      <span class="sep">·</span>
+      <span id="busuanzi_container_site_pv">本站访问 <span id="busuanzi_value_site_pv"></span> 次</span>
+      <span class="sep">·</span>
+      <span id="busuanzi_container_today_uv">今日访客 <span id="busuanzi_value_today_uv"></span> 人</span>
+      <span class="sep">·</span>
+      <span id="busuanzi_container_site_uv">本站访客 <span id="busuanzi_value_site_uv"></span> 人</span>
+    </div>
+
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <script>
+      // 不蒜子数据异步填充，等首个数值出现后再显示统计栏，避免闪现空数字
+      (function () {
+        var bar = document.querySelector('.busuanzi-bar');
+        if (!bar) return;
+        var targets = bar.querySelectorAll('span[id^="busuanzi_value"]');
+        var revealed = false;
+        var reveal = function () {
+          if (revealed) return;
+          revealed = true;
+          bar.classList.add('busuanzi-loaded');
+        };
+        // 任一数值 span 出现非空文本即视为数据就绪
+        var check = function () {
+          for (var i = 0; i < targets.length; i++) {
+            if (targets[i].textContent && targets[i].textContent.trim() !== '') {
+              reveal();
+              break;
+            }
+          }
+        };
+        var mo = new MutationObserver(check);
+        targets.forEach(function (el) {
+          mo.observe(el, { childList: true, characterData: true, subtree: true });
+        });
+        check();
+        // 兜底：脚本加载失败/超时也显示占位（避免永久隐藏）
+        setTimeout(reveal, 4000);
+      })();
+    </script>
   </body>
 </html>
