@@ -55,15 +55,25 @@ const base = import.meta.env.BASE_URL;
     }
 
     <!-- 访问量统计（不蒜子 busuanzi.cc） -->
-    <div class="busuanzi-bar">
-      <span>今日访问 <span id="busuanzi_today_pv">-</span> 次</span>
-      <span class="sep">·</span>
-      <span>本站访问 <span id="busuanzi_site_pv">-</span> 次</span>
-      <span class="sep">·</span>
-      <span>今日访客 <span id="busuanzi_today_uv">-</span> 人</span>
-      <span class="sep">·</span>
-      <span>本站访客 <span id="busuanzi_site_uv">-</span> 人</span>
-    </div>
+    {
+      mode === 'home' ? (
+        <div class="busuanzi-bar">
+          <span>本站访问 <span id="busuanzi_site_pv">-</span> 次</span>
+          <span class="sep">·</span>
+          <span>本站访客 <span id="busuanzi_site_uv">-</span> 人</span>
+        </div>
+      ) : (
+        <div class="busuanzi-bar">
+          <span>今日总访问量 <span id="busuanzi_today_pv">-</span> 次</span>
+          <span class="sep">·</span>
+          <span>今日总访客数 <span id="busuanzi_today_uv">-</span> 人</span>
+          <span class="sep">·</span>
+          <span>本页总阅读量 <span id="busuanzi_page_pv">-</span> 次</span>
+          <span class="sep">·</span>
+          <span>本页总访客数 <span id="busuanzi_page_uv">-</span> 人</span>
+        </div>
+      )
+    }
 
     <script src="//cdn.busuanzi.cc/busuanzi/3.6.9/busuanzi.min.js" defer></script>
   </body>
